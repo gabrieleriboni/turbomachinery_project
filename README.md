@@ -1,1 +1,6 @@
 # turbomachinery_project
+
+-radiale per uno stadio dato il beta_tt, altrimenti con assiale 2/3 stadi
+
+-radiale perchè industrialmente applicato: non esistono assiali per ammonia, di solito sono volumetrici quindi: dobbiamo scegliere a absso omega_s e quindi quelli con più basssa omega_s sono radiali
+
