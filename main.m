@@ -58,7 +58,7 @@ err_new = 1;
 err_rho = [err_new];
 i = 0;
 iter = [i];
-
+alpha = 0.2;
 while abs(err_new) > 1e-6
     
     D1_h = 0.2; % assumption
@@ -94,7 +94,8 @@ while abs(err_new) > 1e-6
     P1 = Pt1 * (T1/Tt1)^(gamma/(gamma-1));
 
     rho_new = P1/R/T1;
-    err_new = abs(rho_new - rho(end))/rho_t1;
+    rho_new = rho + alpha * (rho_new - rho);
+    err_new = abs(rho_new - rho)/rho_t1;
     err_rho = [err_rho; err_new];
     rho_vect = [rho_vect; rho_new];
     i = i+1;

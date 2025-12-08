@@ -53,7 +53,7 @@ M_u = U_2/sqrt(gamma * R * Tt1);  % molto vicino al sonic, stare attenti (come e
 
 % impeller inlet
 
-rho = [rho_t1];
+rho_vect = [rho_t1];
 err_new = 1;
 err_rho = [err_new];
 i = 0;
@@ -63,7 +63,9 @@ while abs(err_new) > 1e-6
     
     D1_h = 0.2; % assumption
     R1_h = D1_h/2;
-    rho = rho(end);
+    rho = rho_vect(end);
+
+
     cm1_max = sqrt(2*cp*Tt1);
     r_min = sqrt(m_dot/rho/cm1_max/pi + R1_h^2);
 
@@ -92,10 +94,10 @@ while abs(err_new) > 1e-6
     P1 = Pt1 * (T1/Tt1)^(gamma/(gamma-1));
 
     rho_new = P1/R/T1;
-    err_new = abs(rho_new - rho(end))/rho_t1;
+    rho_new = rho_vec(end) 
+    err_new = abs(rho_new - rho_vect(end))/rho_t1;
     err_rho = [err_rho; err_new];
-    rho = [rho; rho_new];
-    rho_t1 = rho_new;
+    rho_vect = [rho_vect; rho_new];
     i = i+1;
     iter = [iter; i];
 
@@ -105,7 +107,7 @@ figure
 semilogy(iter, err_rho, '.-')
 grid on
 figure
-plot(iter, rho(, '.-')
+plot(iter, rho_vect, '.-')
 grid on
 
 % velocity triangles outlet(dopo ciclo iterativo)
@@ -116,6 +118,5 @@ W2_tg = V2_tg - U_2;
 W2 = sqrt(V2_m^2 + W2_tg^2); %W2_m = V2_m
 beta2 = atan(W2_tg/V2_m);
 beta2_deg = beta2*180/pi; %torna unshrouded
-
 
 
