@@ -10,25 +10,24 @@ Pt1 = 1; %bar
 Pt1 = Pt1 * 1e5; % Pa
 Tt1 = 300; %K
 
-% properties
+%% properties gas
 cp_exp = 0.037; % kJ/(mol.K)
 cv_exp = 0.028; % kJ/(mol.K)
 Mm = 17.03; %g/mol
 cp = cp_exp/Mm * 1e6;
 cv = cv_exp/Mm * 1e6;
-
 gamma = cp_exp/cv_exp;
 R = cp-cv; % kJ/(mol.K)
 
-
 %% assumptions
 
-omega = 1500; %rpm directly connected to network 4 poles
+omega = 1600; %rpm with gearbox
 % assumiamo inlet con velocità bassa poi iter
 % per ora veramente gas perfetto
 % v1t =0 axial inlet
 alpha_2 = 70;  % piccolo per evitare rircolo come da lezione
 alpha_2 = alpha_2 * pi/180;
+
 %% input balje (omega_s)
 
 dht_is = gamma * R/(gamma -1) * Tt1 * (beta_tt ^((gamma - 1)/gamma) -1);
@@ -38,33 +37,33 @@ omega_s = omega * sqrt(Q_in)/dht_is^(3/4);
 
 %% output balje (Ds, psi)
 
-Ds = 5;  % first guess  %check su psi per shrouded/un
-eta_tt = 0.81; %first guess
+Ds = 4.5;  % first guess  % check su psi per shrouded/un
+eta_c = 0.82; %first guess
 
-%%
+%% iterative process
 
+% input
 D2 = Ds * sqrt(Q_in)/(dht_is^(1/4));
-L = gamma * R/(gamma -1) * Tt1/eta_tt * (beta_tt ^((gamma - 1)/gamma) -1);
+L = gamma * R/(gamma -1) * Tt1/eta_c * (beta_tt ^((gamma - 1)/gamma) -1);
 psi = L/omega^2/D2^2;  %unshrouded
-U_2 = omega * D2/2;
-V2_tg = L/U_2; %backwards
-tau = V2_tg/U_2;
-M_u = U_2/sqrt(gamma * R * Tt1);  % molto vicino al sonic, stare attenti (come es)
+psi_print = psi * 4
+U2 = omega * D2/2;
+V2_tg = L/U2;
+tau = V2_tg/U2; %backwards
+M2_u = U2/sqrt(gamma * R * Tt1);  % molto vicino al sonic, stare attenti (come es)
 
-% impeller inlet
 
 rho_vect = [rho_t1];
 err_new = 1;
 err_rho = [err_new];
 i = 0;
 iter = [i];
-alpha = 0.2;
+relaxation = 0.2;
 while abs(err_new) > 1e-6
-    
+
     D1_h = 0.2; % assumption
     R1_h = D1_h/2;
     rho = rho_vect(end);
-
 
     cm1_max = sqrt(2*cp*Tt1);
     r_min = sqrt(m_dot/rho/cm1_max/pi + R1_h^2);
@@ -76,31 +75,21 @@ while abs(err_new) > 1e-6
     M1_tip= @(r) sqrt(((omega.*r).^2 + cm1(r).^2) ./ (gamma * R * T1(r)));
 
     M1_t_eval = arrayfun(M1_tip,R1_t);
-    [Mmin, idx] = min(M1_t_eval);
+    [M1_tip_rel, idx] = min(M1_t_eval);
 
     R1_t_opt = R1_t(idx);
     D1_t_opt = R1_t_opt*2;
-    nu = D1_h/D1_t_opt; %check [0.3-0.7]
-    b1 = R1_t_opt - R1_h;
-
-    V1 = m_dot/rho/pi/(R1_t_opt^2-R1_h^2);
-
-    W1_tip = sqrt((omega*R1_t_opt)^2 + cm1(R1_t_opt)^2);
-    U1_tip = omega * R1_t_opt;
-    U1_hub = omega * R1_h;
-    V1_tip = sqrt(W1_tip^2 - U1_tip^2);
 
     T1 = Tt1 - cm1(R1_t_opt).^2/(2*cp);
     P1 = Pt1 * (T1/Tt1)^(gamma/(gamma-1));
 
     rho_new = P1/R/T1;
-    rho_new = rho + alpha * (rho_new - rho);
+    rho_new = rho + relaxation * (rho_new - rho);
     err_new = abs(rho_new - rho)/rho_t1;
     err_rho = [err_rho; err_new];
     rho_vect = [rho_vect; rho_new];
     i = i+1;
     iter = [iter; i];
-
 end
 
 figure
@@ -109,14 +98,145 @@ grid on
 figure
 plot(iter, rho_vect, '.-')
 grid on
+%%
+nu = D1_h/D1_t_opt   % check [0.3-0.7]
+mer_grad = D1_t_opt/D2 % check [0.5-0.7]
+b1 = R1_t_opt - R1_h;
+R1_m = 1/2 * (R1_t_opt + R1_h);
+D1_m = R1_m * 2;
 
-% velocity triangles outlet(dopo ciclo iterativo)
+% velocity triangles 1
+U1_tip = omega * R1_t_opt;
+U1_mean = omega * R1_m;
+U1_hub = omega * R1_h;
 
-V2_m = V2_tg/tan(alpha_2);
+W1_tip_t = -U1_tip;
+W1_mean_t = -U1_mean;
+W1_hub_t = -U1_hub;
+W1_meridional = m_dot/rho/pi/(R1_t_opt^2-R1_h^2);
+W1_tip = sqrt(W1_tip_t^2 + W1_meridional^2);
+W1_mean = sqrt(W1_mean_t^2 + W1_meridional^2);
+W1_hub = sqrt(W1_hub_t^2 + W1_meridional^2);
+
+beta1_tip = atan(W1_tip_t/W1_meridional);
+beta1_mean = atan(W1_mean_t/W1_meridional);
+beta1_hub = atan(W1_hub_t/W1_meridional);
+M1_tip_rel
+
+V1 = W1_meridional;
+
+
+% velocity triangles 2
+
+% U2 noto e costante
+% V2_tg nota dal lavoro
+
+V2_meridional = V2_tg/tan(alpha_2);
 V2 = V2_tg/sin(alpha_2);
-W2_tg = V2_tg - U_2;
-W2 = sqrt(V2_m^2 + W2_tg^2); %W2_m = V2_m
-beta2 = atan(W2_tg/V2_m);
+
+W2_tg = V2_tg - U2;
+W2_meridional = V2_meridional;
+W2 = sqrt(W2_meridional^2 + W2_tg^2);
+
+DR = abs(W1_mean_t) / W2
+
+
+beta2 = atan(W2_tg/V2_meridional);
 beta2_deg = beta2*180/pi; %torna unshrouded
 
+Tt2 = L/cp + Tt1;
+T2 = Tt2 - V2^2/(2*cp);
+M2 = V2/sqrt(gamma * R *T2)
 
+chi = cp*(T2-T1)/L
+
+
+%%
+
+eta_tt = 0.90;
+
+Pt2 = Pt1 * (1 + (eta_tt*L)/(cp*Tt1))^(gamma/(gamma - 1));
+P2 = Pt2/(1 + (gamma-1)/2 * M2^2)^(gamma/(gamma - 1));
+rho2 = P2/R/T2;
+
+b2 = m_dot/(rho2*V2_meridional*pi*D2);
+AR = b2/D2 % check [0.03-0.15]
+
+solidity = 1/0.4; % c/s, da eckert suggest
+dtheta = log(D2/D1_m) * tan(beta2);
+R2 = D2/2;
+c = R2 * dtheta/(sin(beta2));
+s = c/solidity;
+
+beta_av = 0.5 * (beta1_mean + beta2);
+% first option
+N_bl = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
+
+% second option
+N_bl2 = ceil(2*pi*sin(beta2)/dtheta*solidity);
+
+if mod(N_bl,2)==1
+    N_bl = N_bl + 1;
+
+end
+
+if mod(N_bl2,2)==1
+    N_bl2 = N_bl2 +1;
+
+end
+
+%mu = 1 - sqrt(cos(beta2))/N_bl^0.7;
+mu = 1 - 0.63*pi/N_bl; % stanitz
+V2_tg_inf = (1- mu)*U2 + V2_tg;
+W2_tg_inf = V2_tg_inf - U2;
+beta2_geom = atan(W2_tg_inf/W2_meridional);
+beta2_geom_deg = beta2_geom *180/pi; % va bene per la correlazione
+
+t = 3e-3; 
+% For ammonia applications, avoid going 
+% below 2.5 mm – 3.0 mm at the tip. 
+% Standard aero-compressors might go down to 0.8 mm, 
+% but this is too fragile for industrial ammonia service where 
+% impurities or liquid droplets might exist
+beta1_geom_tip = atan(1-t*N_bl/(2*pi*R1_t_opt)*tan(beta1_tip));
+beta1_geom_mean = atan(1-t*N_bl/(2*pi*R1_m)*tan(beta1_mean));
+beta1_geom_hub = atan(1-t*N_bl/(2*pi*R1_h)*tan(beta1_hub));
+%% rotor losses
+
+% incidence=0 per costruzione
+
+% profile
+
+% skin friction (Jansen, 1967)
+
+Cf_mooody = 0.014;
+Cf = Cf_mooody + 0.0015;
+D_h = 4*(2*pi*R2*b2/N_bl)/(2*b2+2*2*pi*R2/N_bl);
+L_h = (R2-R1_m)/cos(beta_av);
+dH_fr = (4 * Cf * W2^2 * L_h)/(2*D_h);
+
+% clearance
+
+eps = 5e-4;
+dH_cl = 0.1*eps/b2*U2^2;
+
+% diffusion and blade loading (Rodgers & Sapiro, 1972)
+
+W1_ave = (W1_hub+W1_tip)/2;
+D_factor = 1 - W2/W1_ave + (2*pi*R2*L)/(2*N_bl*L_h*W1_ave*U2) + 0.1*(R1_t-R1_h+b2)/(R2-R1_t)*(1+W2/W1_ave);
+dH_diff = 0.05*D_factor^2*U2^2;
+
+% disk friction  (controllare)
+Re_df = U2*R2/visc; 
+dH_disk = f_df * (rho + rho_2)*R2^2*U2^3/(8*m_dot);
+
+% recirculation
+dH_rec = 0.02*sqrt(tan(alpha_2))*D_factor^2*U2^2;
+
+% leakage
+
+dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t-R1_h)/(R2-R1_t))/(1+rho2/rho)*V2_tg*V1);
+% distribution
+
+
+dH_tot = dH_diff + dH_fr + dH_cl; %da aggiungere
