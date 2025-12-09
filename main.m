@@ -316,6 +316,9 @@ dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t-R1_h)/(R2-R1_t))/(1+rho2/rh
 
 %dH_tot =  dH_fr + dH_cl + dH_diff + dH_disk + dH_rec + dH_leak;
 
+%dH_t_is_new = L - dH_tot;
+
+%eta_tt_new = dH_t_is_new/L;
 
 m_dot1 = rho * V1 * pi * (R1_t_opt^2 - R1_h^2); % V1_ax = V1
 m_dot2 = rho2 * V2_meridional * pi * ((R2+b2/2)^2-(R2-b2/2)^2);
