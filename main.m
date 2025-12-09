@@ -1,3 +1,13 @@
+%                                                                         %
+%                   MAIN CODE, TURBOMACHINERY PROJECT                     %
+%                    Ascari Jacopo, Riboni Gabriele                       %
+%                        CENTRIFUGAL COMPRESSOR                           %
+%                          1: Impeller Inlet                              %
+%                          2: Impeller Outlet                             %
+%                          3:                               %
+%                          4:                               %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 clear
 close all
 clc
@@ -293,7 +303,7 @@ visc_din= 1.0e-5;
 visc = visc_din/rho;
 Re_df = U2*R2/visc;
 %f_df = 
-dH_disk = f_df * (rho + rho_2)*R2^2*U2^3/(8*m_dot);
+%dH_disk = f_df * (rho + rho_2)*R2^2*U2^3/(8*m_dot);
 
 % recirculation
 dH_rec = 0.02*sqrt(tan(alpha_2))*D_factor^2*U2^2;
@@ -304,11 +314,11 @@ dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t-R1_h)/(R2-R1_t))/(1+rho2/rh
 % distribution
 
 
-dH_tot =  dH_fr + dH_cl + dH_diff + dH_disk + dH_rec + dH_leak;
+%dH_tot =  dH_fr + dH_cl + dH_diff + dH_disk + dH_rec + dH_leak;
 
 
-% m_dot1 = ;
-% m_dot2 = ;
+m_dot1 = rho * V1 * pi * (R1_t_opt^2 - R1_h^2); % V1_ax = V1
+m_dot2 = rho2 * V2_meridional * pi * ((R2+b2/2)^2-(R2-b2/2)^2);
 check = {'psi', psi * 4,'[]';
      'nu', nu, '[0.3-0.7]';
      'mer_grad', mer_grad, '[0.5-0.7]';
@@ -317,6 +327,6 @@ check = {'psi', psi * 4,'[]';
      'M2',M2, '[]';
      'chi',chi, '[]';
      'AR',AR, '[0.03-0.15]';
-     'm. flow in','',''
-     'm. flow 1',m_dot1,'';
-     'm. flow 2',m_dot2,''}
+     'm. flow in',m_dot,'3'
+     'm. flow 1',m_dot1,'3';
+     'm. flow 2',m_dot2,'3'}
