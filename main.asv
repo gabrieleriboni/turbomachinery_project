@@ -46,7 +46,6 @@ eta_c = 0.82; %first guess
 D2 = Ds * sqrt(Q_in)/(dht_is^(1/4));
 L = gamma * R/(gamma -1) * Tt1/eta_c * (beta_tt ^((gamma - 1)/gamma) -1);
 psi = L/omega^2/D2^2;  %unshrouded
-psi_print = psi * 4
 U2 = omega * D2/2;
 V2_tg = L/U2;
 tau = V2_tg/U2; %backwards
@@ -91,16 +90,23 @@ while abs(err_new) > 1e-6
     i = i+1;
     iter = [iter; i];
 end
-
+%% plot
 figure
 semilogy(iter, err_rho, '.-')
 grid on
+title('err_{\rho}')
+xlabel('iter')
+ylabel('log(err)')
 figure
 plot(iter, rho_vect, '.-')
 grid on
+title('density')
+xlabel('iter')
+ylabel('err')
+
 %%
-nu = D1_h/D1_t_opt   % check [0.3-0.7]
-mer_grad = D1_t_opt/D2 % check [0.5-0.7]
+nu = D1_h/D1_t_opt;   % check [0.3-0.7]
+mer_grad = D1_t_opt/D2; % check [0.5-0.7]
 b1 = R1_t_opt - R1_h;
 R1_m = 1/2 * (R1_t_opt + R1_h);
 D1_m = R1_m * 2;
@@ -121,7 +127,7 @@ W1_hub = sqrt(W1_hub_t^2 + W1_meridional^2);
 beta1_tip = atan(W1_tip_t/W1_meridional);
 beta1_mean = atan(W1_mean_t/W1_meridional);
 beta1_hub = atan(W1_hub_t/W1_meridional);
-M1_tip_rel
+M1_tip_rel;
 
 V1 = W1_meridional;
 
@@ -138,17 +144,73 @@ W2_tg = V2_tg - U2;
 W2_meridional = V2_meridional;
 W2 = sqrt(W2_meridional^2 + W2_tg^2);
 
-DR = abs(W1_mean_t) / W2
+%% plot velocity triangles
 
+figure
+subplot(1,2,1)
+title('impeller inlet')
+xlabel('meridional')
+ylabel('tangential')
+hold on
+
+% W1 parte da U1
+quiver(0,U1_tip,  W1_meridional,W1_tip_t, 0, 'r')
+quiver(0,U1_mean, W1_meridional,W1_mean_t, 0, 'r')
+quiver(0,U1_hub,  W1_meridional,W1_hub_t, 0, 'r')
+
+% U1 
+quiver(0,0, 0,U1_tip, 0,  'k')
+quiver(0,0, 0,U1_mean, 0, 'k')
+quiver(0,0, 0,U1_hub, 0, 'k')
+
+% V1 
+quiver(0,0, V1,0, 0,'c')
+axis equal
+grid on
+
+
+offset = 1.5;
+text(V1/2, offset, 'V_1', 'Color','c');
+text(0, U1_tip/2 + offset, 'U_{1,tip}', 'Color','k');
+text(0, U1_mean/2 + offset, 'U_{1,mean}', 'Color','k');
+text(0, U1_hub/2 + offset, 'U_{1,hub}', 'Color','k');
+text(W1_meridional/2, U1_tip + W1_tip_t/2 + offset, 'W_{1,tip}', 'Color','r');
+text(W1_meridional/2, U1_mean + W1_mean_t/2 + offset, 'W_{1,mean}', 'Color','r');
+text(W1_meridional/2, U1_hub + W1_hub_t/2 + offset, 'W_{1,hub}', 'Color','r');
+
+subplot(1,2,2)
+title('impeller outlet')
+xlabel('meridional')
+ylabel('tangential')
+hold on
+
+% W2 parte da U2
+quiver(0,U2,  W2_meridional,W2_tg, 0, 'r')
+
+% U2
+quiver(0,0, 0,U2, 0, 'k')
+
+% V2
+quiver(0,0, V2_meridional, V2_tg, 0,'c')
+axis equal
+grid on
+
+offset2 = 1.5;
+text(V2_meridional/2 + offset2, V2_tg/2 + offset2, 'V_2', 'Color','c');
+text(0, U2/2 + offset2, 'U_2', 'Color','k');
+text(W2_meridional/2, U2 + W2_tg/2 + offset2, 'W_2', 'Color','r');
+
+%%
+DR = abs(W1_mean_t) / W2;
 
 beta2 = atan(W2_tg/V2_meridional);
 beta2_deg = beta2*180/pi; %torna unshrouded
 
 Tt2 = L/cp + Tt1;
 T2 = Tt2 - V2^2/(2*cp);
-M2 = V2/sqrt(gamma * R *T2)
+M2 = V2/sqrt(gamma * R *T2);
 
-chi = cp*(T2-T1)/L
+chi = cp*(T2-T1)/L;
 
 
 %%
@@ -160,7 +222,7 @@ P2 = Pt2/(1 + (gamma-1)/2 * M2^2)^(gamma/(gamma - 1));
 rho2 = P2/R/T2;
 
 b2 = m_dot/(rho2*V2_meridional*pi*D2);
-AR = b2/D2 % check [0.03-0.15]
+AR = b2/D2; % check [0.03-0.15]
 
 solidity = 1/0.4; % c/s, da eckert suggest
 dtheta = log(D2/D1_m) * tan(beta2);
@@ -226,12 +288,31 @@ W1_ave = (W1_hub+W1_tip)/2;
 D_factor = 1 - W2/W1_ave + (2*pi*R2*L)/(2*N_bl*L_h*W1_ave*U2) + 0.1*(R1_t-R1_h+b2)/(R2-R1_t)*(1+W2/W1_ave);
 dH_diff = 0.05*D_factor^2*U2^2;
 
-% disk friction
+% disk friction  (controllare)
+Re_df = U2*R2/visc; 
+dH_disk = f_df * (rho + rho_2)*R2^2*U2^3/(8*m_dot);
 
-dH_disk = f_df * (rho + rho_2)*R2^2*U2^3
 % recirculation
+dH_rec = 0.02*sqrt(tan(alpha_2))*D_factor^2*U2^2;
+
+% leakage
+
+dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t-R1_h)/(R2-R1_t))/(1+rho2/rho)*V2_tg*V1);
 
 % distribution
 
 
-dH_tot = dH_diff + dH_fr + dH_cl;
+dH_tot =  dH_fr + dH_cl + dH_diff + dH_disk + dH_rec + dH_leak;
+
+
+
+
+check = {'psi', psi * 4,'[]';
+     'nu', nu, '[0.3-0.7]';
+     'mer_grad', mer_grad, '[0.5-0.7]';
+     'M1_tip_rel',M1_tip_rel,'';
+     'DR',DR, '[]';
+     'M2',M2, '[]';
+     'chi',chi, '[]';
+     'AR',AR, '[0.03-0.15]';
+     }
