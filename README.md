@@ -5,3 +5,4 @@
 -radiale perchè industrialmente applicato: non esistono assiali per ammonia, di solito sono volumetrici quindi: dobbiamo scegliere a absso omega_s e quindi quelli con più basssa omega_s sono radiali
 
 -dai calcoli abbiamo un unshrouded poi confermato da calcoli successivi
+-da paper china il Set 1 è quello ottimale dato il nostro M1_w_tip
