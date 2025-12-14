@@ -231,7 +231,6 @@ while abs(err_eta_new) > 1e-6
 
     %% rotor losses
 
-
     % incidence=0 per costruzione
 
     %%% IMPELLER INTERNAL
@@ -340,7 +339,7 @@ ylabel('err')
 
 %% 3. Vaneless Diffuser
 
-b3 = % we introduce a slight pinch
+%b3 = % we introduce a slight pinch
 D3 = 1.2*D2;   % NOTARE CHE D5/D2 = 1.5/1.6 MINIMUM
 R3 = D3/2;
 Tt3 = Tt2;
@@ -368,12 +367,46 @@ visc_din3 = visc_din2;
 % P3 = Pt3/(1+(gamma-1)/2*M3^2)^(gamma/(gamma-1));
 % rho3_new = P3/(T3*R);
 
+% fare ciclo while iterando su rho, poi fare vaned diffuser
+
+%eta_d = 0.9;  %first guess
+% P4 = P3 + Cp*(Pt3-P3);
+% T4_is = T3*(P4/P3)^((gamma-1)/gamma);
+% T4 = (T4_is-T3)/eta_d_guess+T3;
+% Tt4 = Tt2;
+% V4 = sqrt(2*cp*(Tt4-T4));
+% M4 = V4/sqrt(gamma*R*T4);
+% rho4 = P4/(R*T4);
+
+% ee = ;
+% AR = ;
+% N_bl_d = ceil(360/ee);
+% 
+% H3 = (2*pi*R3*cos(alpha3))/N_bl_d;
+% S3 = H3*b3;
+% S4 = AR*S3;
+
+% L3_b = ;
+% Ld = b3*L3_b;
+% alpha4 = atan(R3*sin(alpha3)/(Ld+R3*cos(alpha3)));
+% R4 = sqrt(Ld^2+R3^2+2*Ld*R3*cos(alpha3));
+% H4 = (2*pi*R4*cos(alpha4))/N_bl_d;
+% b4 = S4/H4;
+
+% Pt4_new = P4*(1+(gamma-1)/2*M4^2)^(gamma/(gamma-1));
+% L_is_new = Cp*T_t1*((Pt4_new/Pt1)^((gamma-1)/gamma)-1);
+% 
+% eta_new = L_is_new/L;
+
+% fare ciclo while su tutto eta
 
 
 %% Checks
 
 m_dot1 = rho * V1 * pi * (R1_t_opt^2 - R1_h^2); % V1_meridional = V1
 m_dot2 = rho2 * V2_meridional * D2 * b2 * pi;
+%m_dot3 = rho3 * V3_meridional*D3*b3*pi;
+%m_dot4 = rho4*V4*S4*N_bl_d;
 
 check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'tau', tau, '<1 backwards';
@@ -392,7 +425,9 @@ check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'U2', U2, '[for mechanical stresses]';
     'm. flow in',m_dot,'3';
     'm. flow 1',m_dot1,'3';
-    'm. flow 2',m_dot2,'3'}
+    'm. flow 2',m_dot2,'3';
+    'm. flow 3','m_dot3','3';
+    'm. flow 4','m_dot4','3'}
 
 %% plot velocity triangles
 
