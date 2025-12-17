@@ -34,7 +34,7 @@ R = cp-cv; % kJ/(mol.K)
 
 %%% assumptions %%%
 
-rpm = 1600; %rpm with gearbox
+rpm = 15000; %rpm with gearbox
 omega = rpm * 2*pi/60;
 % assumiamo inlet con velocità bassa poi iter
 % per ora veramente gas perfetto
@@ -56,12 +56,19 @@ omega_s = omega * sqrt(Q_in)/dht_is^(3/4);
 Ds = 4.5;  % first guess  % check su psi per shrouded/un
 eta_c = 0.82; %first guess
 
+err_o = 1;
+eta_c_vect = [eta_c];
+err_tot_vect = [err_o];
+m = 0;
+iter_tot = [m];
+
+while abs(err_tot_vect(end))>1e-5
 %% iterative process
 
 %%% input
 
 D2 = Ds * sqrt(Q_in)/(dht_is^(1/4));
-L = gamma * R/(gamma -1) * Tt1/eta_c * (beta_tt ^((gamma - 1)/gamma) -1);
+L = gamma * R/(gamma -1) * Tt1/eta_c_vect(end) * (beta_tt ^((gamma - 1)/gamma) -1);
 psi = L/omega^2/D2^2;  %unshrouded
 U2 = omega * D2/2;
 V2_tg = L/U2;
@@ -73,7 +80,7 @@ err_new = 1;
 err_rho = [err_new];
 i = 0;
 iter = [i];
-relaxation = 0.2;
+relaxation = 0.5;
 while abs(err_new) > 1e-6
 
     D1_h = 0.2; % assumption
@@ -100,7 +107,7 @@ while abs(err_new) > 1e-6
 
     rho_new = P1/R/T1;
     rho_new = rho + relaxation * (rho_new - rho);
-    err_new = abs(rho_new - rho)/rho_t1;
+    err_new = abs(rho_new - rho)/rho;
     err_rho = [err_rho; err_new];
     rho_vect = [rho_vect; rho_new];
     i = i+1;
@@ -109,18 +116,18 @@ end
 rho1 = rho_vect(end);
 %% plot iterative process rho1
 
-figure
-semilogy(iter, err_rho, '.-')
-grid on
-title('err_{\rho}')
-xlabel('iter')
-ylabel('log(err)')
-figure
-plot(iter, rho_vect, '.-')
-grid on
-title('density')
-xlabel('iter')
-ylabel('err')
+% figure
+% semilogy(iter, err_rho, '.-')
+% grid on
+% title('err_{\rho}')
+% xlabel('iter')
+% ylabel('log(err)')
+% figure
+% plot(iter, rho_vect, '.-')
+% grid on
+% title('rho1')
+% xlabel('iter')
+% ylabel('rho1')
 
 %%
 
@@ -173,7 +180,7 @@ err_eta_new = 1;
 err_eta = [err_eta_new];
 k = 0;
 iter_eta = [k];
-relaxation2 = 0.2;
+relaxation2 = 0.5;
 
 while abs(err_eta_new) > 1e-6
     eta_tt = eta_tt_vect(end);
@@ -202,12 +209,13 @@ while abs(err_eta_new) > 1e-6
     R2 = D2/2;
     c = R2 * dtheta/(sin(beta2));
     s = c/solidity;
-    N_bl = ceil(pi*D1_m/(s+t))+1;
+    t = 0.003*D2;
+    % N_bl = ceil(pi*D1_m/(s));
 
     beta_av = 0.5 * (beta1_mean + beta2);
 
     % Stodola formula
-    %N_bl = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
+    N_bl = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
 
     if mod(N_bl,2)==1
         N_bl = N_bl + 1;
@@ -221,7 +229,7 @@ while abs(err_eta_new) > 1e-6
     beta2_geom = atan(W2_tg_inf/W2_meridional);
     beta2_geom_deg = beta2_geom *180/pi; % va bene per la correlazione
 
-    t = 0.003*D2;
+    
     % For ammonia applications, avoid going
     % below 2.5 mm – 3.0 mm at the tip.
     % Standard aero-compressors might go down to 0.8 mm,
@@ -235,6 +243,8 @@ while abs(err_eta_new) > 1e-6
 
     % incidence=0 per costruzione ma non off-design
     
+    dH_inc = 0.4*(W1_mean - V1/cos(beta1_mean))^2;
+
     %%% IMPELLER INTERNAL
     % skin friction (Jansen, 1967)
     visc_din1 = 1.76e-05; %sutherland
@@ -279,28 +289,28 @@ while abs(err_eta_new) > 1e-6
     dH_mix = 1/2 * (W_sep - W_out)^2;
 
     % entrance diffusion (Aungier)
-    pitch = pi*D1_m/N_bl - t;
-    A_th_geom = pitch * cos(beta1_geom_mean)*b1;
+    % pitch = pi*D1_m/N_bl - t;
+    A_th_geom = s * cos(beta1_geom_mean)*b1;
     A_th = 0.97 * A_th_geom;
-    W_th = m_dot/rho1/A_th;
+    W_th = m_dot/N_bl/rho1/A_th;
     dH_diff = 0.4*(W1_mean - W_th)^2;
     if (W1_tip/W_th > 1.75) && (dH_diff < 0.5*(W1_tip - 1.75*W_th)^2)
             dH_diff = 0.5*(W1_tip - 1.75*W_th)^2;
     end
    
-    % % choke losses
-    
-    % A_th_star = m_dot/rho1/sqrt(gamma*R*T1);
-    % C_r = sqrt(A1*cos(beta1_geom_mean)/A_th);
-    % if C_r > 1-(A1*cos(beta1_geom_mean)/A_th -1)^2
-    %     C_r = 1-(A1*cos(beta1_geom_mean)/A_th -1)^2;
-    % end
-    % X = 11 - 10*(C_r*A_th)/A_th_star;
-    % if X<=0
-    %     dH_choke = 0;
-    % else 
-    %     dH_choke = 1/2*W1_mean^2*(0.05*X+X^7);
-    % end
+    % choke losses
+    M1_mean_rel = W1_mean/sqrt(gamma*R*T1);
+    A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/2*(gamma-1))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
+    C_r = sqrt((A1/N_bl-t)*cos(beta1_geom_mean)/A_th);
+    if C_r > 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2
+        C_r = 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2;
+    end
+    X = 11 - 10*(C_r*A_th)/A_th_star;
+    if X<=0
+        dH_choke = 0;
+    else 
+        dH_choke = 1/2*W1_mean^2*(0.05*X+X^7);
+    end
 
     
 
@@ -326,7 +336,7 @@ while abs(err_eta_new) > 1e-6
     
 
     % AGGIUNGERE dH_diff
-    dH_tot_internal =  dH_fr + + dH_bl + dH_mix + dH_cl + dH_diff;
+    dH_tot_internal =  dH_inc + dH_fr + dH_bl + dH_mix + dH_cl + dH_diff + dH_choke;
     dH_tot_parassitic = dH_disk + dH_rec + dH_leak;
     dH_tot = dH_tot_internal + dH_tot_parassitic;
 
@@ -346,80 +356,141 @@ end
 
 %% plot iterative process eta_tt
 
-figure
-semilogy(iter_eta, err_eta, '.-')
-grid on
-title('err_{\eta}')
-xlabel('iter')
-ylabel('log(err)')
-figure
-plot(iter_eta, eta_tt_vect, '.-')
-grid on
-title('\eta')
-xlabel('iter')
-ylabel('err')
+% figure
+% semilogy(iter_eta, err_eta, '.-')
+% grid on
+% title('err_{\eta}')
+% xlabel('iter')
+% ylabel('log(err)')
+% figure
+% plot(iter_eta, eta_tt_vect, '.-')
+% grid on
+% title('\eta')
+% xlabel('iter')
+% ylabel('\eta')
 % itero per diff di eta poi ricalcolo Pt2_new e P2_new e b2_new
 
 %% 3. Vaneless Diffuser
 
-%b3 = % we introduce a slight pinch
-D3 = 1.2*D2;   % NOTARE CHE D5/D2 = 1.5/1.6 MINIMUM
+b3 = b2;        % we introduce a slight pinch
+D3 = 1.2*D2;    % NOTARE CHE D5/D2 = 1.5/1.6 MINIMUM
 R3 = D3/2;
 Tt3 = Tt2;
 visc_din3 = visc_din2;
 
+rho3 = rho2;  %first guess
+V3 = V2;      %first guess
+k = 0.01;
+errV3 = 1;
+errrho3 = 1;
+j = 0;
+err_V3 = [errV3];
+err_rho3= [errrho3];
+rho3_vect = [rho3];
+V3_vect = [V3];
+iter_rho3 = [j];
+relaxation3 = 0.2;
 
-% rho3 = rho2;  %first guess
-% V3 = V2;      %first guess
-% k = 0.01;
-% rho_avg = 0.5*(rho2 + rho3);
-% V_avg = 0.5 * (V2 + V3);
-% D_avg = 0.5 * (D2+D3);
-% Re_avg = rho_avg * V_avg * D_avg/visc_din3;
-% Cf_vaned = k*(1.8e5/Re_avg)^0.2;
-% V3_tg = V2_tg/(D3/D2+0.5*pi*Cf_vaned*rho2*V2_tg*D3*(D3-D2)/m_dot);
-% V3_meridional = (V2_meridional*rho2*pi*D2*b2)/(rho3*pi*D3*b3);
-% V3_new = sqrt(V3_meridional^2+V3_tg^2);
+while abs(err_rho3(end))>1e-5 || abs(err_V3(end))>1e-5
 
-% dH_t_VD = Cf_vaned * V1^2 * R2 *(1-(R2/R3)^1.5)/(1.5*b2*cos(alpha_2));
+    rho3 = rho3_vect(end);
+    V3 = V3_vect(end);
+    rho_avg = 0.5*(rho2 + rho3);
+    V_avg = 0.5 * (V2 + V3);
+    D_avg = 0.5 * (D2+D3);
+    Re_avg = rho_avg * V_avg * D_avg/visc_din3;
+    Cf_vaned = k*(1.8e5/Re_avg)^0.2;
+    V3_tg = V2_tg/(D3/D2+0.5*pi*Cf_vaned*rho2*V2_tg*D3*(D3-D2)/m_dot);
+    V3_meridional = (V2_meridional*rho2*pi*D2*b2)/(rho3*pi*D3*b3);
+    alpha3 = atan(V3_tg/V3_meridional);
+    V3_new = sqrt(V3_meridional^2+V3_tg^2);
+    errV3_new = abs(V3_new-V3)/V3;
+    err_V3 = [err_V3; errV3_new];
+    V3_vect = [V3_vect; V3_new];
+    V3 = V3_vect(end);
+
+    dH_t_VD = Cf_vaned * V1^2 * R2 *(1-(R2/R3)^1.5)/(1.5*b2*cos(alpha_2));
+
+    T3 = Tt3-1/(2*cp)*V3^2;
+    M3 = V3/sqrt(gamma*R*T3);
+    Tt3_is = Tt3-dH_t_VD/cp;
+    Pt3 = Pt2*(Tt3_is/Tt2)^(gamma/(gamma-1));
+    P3 = Pt3/(1+(gamma-1)/2*M3^2)^(gamma/(gamma-1));
+    rho3_new = P3/(T3*R);
+    rho3_new = rho3 + relaxation3 * (rho3_new - rho3);
+
+    errrho3_new = abs(rho3_new - rho3)/rho3;
+    err_rho3 = [err_rho3; errrho3_new];
+    rho3_vect = [rho3_vect; rho3_new];
+    j = j+1;
+    iter_rho3 = [iter_rho3; j];
+end
+
+%% plot iterative process rho3
+
+% figure
+% semilogy(iter_rho3, err_rho3, '.-')
+% grid on
+% title('err_{\rho3}')
+% xlabel('iter')
+% ylabel('log(err_rho3)')
+% figure
+% plot(iter_rho3, rho3_vect, '.-')
+% grid on
+% title('rho3')
+% xlabel('iter')
+% ylabel('rho3')
 % 
-% T3 = Tt3-1/(2*cp)*V3^2;
-% M3 = V3/sqrt(gamma*R*T3);
-% Tt3_is = Tt3-dH_t_VD/cp;
-% Pt3 = Pt2*(Tt3_is/Tt2)^(gamma/(gamma-1));
-% P3 = Pt3/(1+(gamma-1)/2*M3^2)^(gamma/(gamma-1));
-% rho3_new = P3/(T3*R);
+% figure
+% semilogy(iter_rho3, err_V3, '.-')
+% grid on
+% title('err_{V3}')
+% xlabel('iter')
+% ylabel('log(err)')
+% figure
+% plot(iter_rho3, V3_vect, '.-')
+% grid on
+% title('V3')
+% xlabel('iter')
+% ylabel('V3')
 
-% fare ciclo while iterando su rho, poi fare vaned diffuser
+%% 4. Vaned Diffuser
 
-%eta_d = 0.9;  %first guess
-% P4 = P3 + Cp*(Pt3-P3);
-% T4_is = T3*(P4/P3)^((gamma-1)/gamma);
-% T4 = (T4_is-T3)/eta_d_guess+T3;
-% Tt4 = Tt2;
-% V4 = sqrt(2*cp*(Tt4-T4));
-% M4 = V4/sqrt(gamma*R*T4);
-% rho4 = P4/(R*T4);
+C_p = 0.75;     %check
+eta_d = 0.9;    %first guess
+P4 = P3 + C_p*(Pt3-P3);
+T4_is = T3*(P4/P3)^((gamma-1)/gamma);
+T4 = (T4_is-T3)/eta_d+T3;
+Tt4 = Tt2;
+V4 = sqrt(2*cp*(Tt4-T4));
+M4 = V4/sqrt(gamma*R*T4);
+rho4 = P4/(R*T4);
 
-% ee = ;
-% AR = ;
-% N_bl_d = ceil(360/ee);
-% 
-% H3 = (2*pi*R3*cos(alpha3))/N_bl_d;
-% S3 = H3*b3;
-% S4 = AR*S3;
+ee = 8;         %check
+AR = 2.8;       %check
+N_bl_d = ceil(360/ee);
 
-% L3_b = ;
-% Ld = b3*L3_b;
-% alpha4 = atan(R3*sin(alpha3)/(Ld+R3*cos(alpha3)));
-% R4 = sqrt(Ld^2+R3^2+2*Ld*R3*cos(alpha3));
-% H4 = (2*pi*R4*cos(alpha4))/N_bl_d;
-% b4 = S4/H4;
+H3 = (2*pi*R3*cos(alpha3))/N_bl_d;
+S3 = H3*b3;
+S4 = AR*S3;
 
-% Pt4_new = P4*(1+(gamma-1)/2*M4^2)^(gamma/(gamma-1));
-% L_is_new = Cp*T_t1*((Pt4_new/Pt1)^((gamma-1)/gamma)-1);
-% 
-% eta_new = L_is_new/L;
+L3_b = 13;      %check
+Ld = b3*L3_b;
+alpha4 = atan(R3*sin(alpha3)/(Ld+R3*cos(alpha3)));
+R4 = sqrt(Ld^2+R3^2+2*Ld*R3*cos(alpha3));
+H4 = (2*pi*R4*cos(alpha4))/N_bl_d;
+b4 = S4/H4;
+
+Pt4_new = P4*(1+(gamma-1)/2*M4^2)^(gamma/(gamma-1));
+L_is_new = cp*Tt1*((Pt4_new/Pt1)^((gamma-1)/gamma)-1);
+
+eta_new = L_is_new/L;
+
+err_tot = eta_new - eta_c;
+err_tot_vect = [err_tot_vect; err_tot];
+eta_c_vect = [eta_c_vect; eta_new];
+iter_tot = [iter_tot, m];
+end
 
 % fare ciclo while su tutto eta
 
@@ -428,8 +499,8 @@ visc_din3 = visc_din2;
 
 m_dot1 = rho * V1 * pi * (R1_t_opt^2 - R1_h^2); % V1_meridional = V1
 m_dot2 = rho2 * V2_meridional * D2 * b2 * pi;
-%m_dot3 = rho3 * V3_meridional*D3*b3*pi;
-%m_dot4 = rho4*V4*S4*N_bl_d;
+m_dot3 = rho3 * V3_meridional*D3*b3*pi;
+m_dot4 = rho4*V4*S4*N_bl_d;
 
 check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'tau', tau, '<1 backwards';
@@ -449,8 +520,8 @@ check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'm. flow in',m_dot,'3';
     'm. flow 1',m_dot1,'3';
     'm. flow 2',m_dot2,'3';
-    'm. flow 3','m_dot3','3';
-    'm. flow 4','m_dot4','3'}
+    'm. flow 3',m_dot3,'3';
+    'm. flow 4',m_dot4,'3'}
 
 %% plot velocity triangles
 
