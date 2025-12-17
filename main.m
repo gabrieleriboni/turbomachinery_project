@@ -34,7 +34,8 @@ R = cp-cv; % kJ/(mol.K)
 
 %%% assumptions %%%
 
-omega = 1600; %rpm with gearbox
+rpm = 15000; %rpm with gearbox
+omega = rpm * 2*pi/60;
 % assumiamo inlet con velocità bassa poi iter
 % per ora veramente gas perfetto
 % v1t =0 axial inlet
@@ -201,11 +202,13 @@ while abs(err_eta_new) > 1e-6
     R2 = D2/2;
     c = R2 * dtheta/(sin(beta2));
     s = c/solidity;
+    t = 0.003*D2;
+    N_bl = ceil(pi*D1_m/(s+t));
 
     beta_av = 0.5 * (beta1_mean + beta2);
 
     % Stodola formula
-    N_bl = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
+    %N_bl = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
 
     if mod(N_bl,2)==1
         N_bl = N_bl + 1;
@@ -219,7 +222,7 @@ while abs(err_eta_new) > 1e-6
     beta2_geom = atan(W2_tg_inf/W2_meridional);
     beta2_geom_deg = beta2_geom *180/pi; % va bene per la correlazione
 
-    t = 3e-3;
+    
     % For ammonia applications, avoid going
     % below 2.5 mm – 3.0 mm at the tip.
     % Standard aero-compressors might go down to 0.8 mm,
@@ -277,8 +280,8 @@ while abs(err_eta_new) > 1e-6
     dH_mix = 1/2 * (W_sep - W_out)^2;
 
     % entrance diffusion (Aungier)
-    pitch = pi*D1_m/N_bl - t;
-    A_th_geom = pitch * cos(beta1_geom_mean)*b1;
+    % pitch = pi*D1_m/N_bl - t;
+    A_th_geom = s * cos(beta1_geom_mean)*b1;
     A_th = 0.97 * A_th_geom;
     W_th = m_dot/rho1/A_th;
     dH_diff = 0.4*(W1_mean - W_th)^2;

@@ -34,7 +34,8 @@ R = cp-cv; % kJ/(mol.K)
 
 %%% assumptions %%%
 
-omega = 1600; %rpm with gearbox
+rpm = 1600; %rpm with gearbox
+omega = rpm * 2*pi/60;
 % assumiamo inlet con velocità bassa poi iter
 % per ora veramente gas perfetto
 % v1t =0 axial inlet
@@ -201,15 +202,15 @@ while abs(err_eta_new) > 1e-6
     R2 = D2/2;
     c = R2 * dtheta/(sin(beta2));
     s = c/solidity;
+    N_bl = ceil(pi*D1_m/(s+t))+1;
 
     beta_av = 0.5 * (beta1_mean + beta2);
 
     % Stodola formula
-    N_bl = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
+    %N_bl = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
 
     if mod(N_bl,2)==1
         N_bl = N_bl + 1;
-
     end
 
 
@@ -220,7 +221,7 @@ while abs(err_eta_new) > 1e-6
     beta2_geom = atan(W2_tg_inf/W2_meridional);
     beta2_geom_deg = beta2_geom *180/pi; % va bene per la correlazione
 
-    t = 3e-3;
+    t = 0.003*D2;
     % For ammonia applications, avoid going
     % below 2.5 mm – 3.0 mm at the tip.
     % Standard aero-compressors might go down to 0.8 mm,
@@ -232,8 +233,8 @@ while abs(err_eta_new) > 1e-6
 
     %% rotor losses
 
-    % incidence=0 per costruzione
-
+    % incidence=0 per costruzione ma non off-design
+    
     %%% IMPELLER INTERNAL
     % skin friction (Jansen, 1967)
     visc_din1 = 1.76e-05; %sutherland
@@ -271,34 +272,37 @@ while abs(err_eta_new) > 1e-6
     else
         W_sep = W2*D_eq*0.5;
     end
-    t_te = 2e-3; % CONTROLLARE
+    t_te = 2e-3; % imposto da geometria
     eps2 = 1- (N_bl * t_te)/(pi*D2);
     A2 = pi*b2*D2*eps2;
     W_out = sqrt((V2_meridional*A2/(pi*D2*b2))^2+W1_mean_t^2);
     dH_mix = 1/2 * (W_sep - W_out)^2;
-    % choke losses
-    A_th_geom = s * cos(beta1_geom_mean)*b1;
-    A_th = 0.97 * A_th_geom;
-    A_th_star = m_dot/rho1/sqrt(gamma*R*T1);
-    C_r = sqrt(A1*cos(beta1_geom_mean)/A_th);
-    if C_r > 1-(A1*cos(beta1_geom_mean)/A_th -1)^2
-        C_r = 1-(A1*cos(beta1_geom_mean)/A_th -1)^2;
-    end
-    X = 11 - 10*(C_r*A_th)/A_th_star;
-    if X<=0
-        dH_choke = 0;
-    else 
-        dH_choke = 1/2*W1_mean^2*(0.05*X+X^7);
-    end
 
     % entrance diffusion (Aungier)
+    pitch = pi*D1_m/N_bl - t;
+    A_th_geom = pitch * cos(beta1_geom_mean)*b1;
+    A_th = 0.97 * A_th_geom;
     W_th = m_dot/rho1/A_th;
     dH_diff = 0.4*(W1_mean - W_th)^2;
-    if W1_tip/W_th > 1.75 & dH_diff < 0.5*(W1_tip - 1.75*W_th)^2
-        if dH_diff < 0.5*(W1_tip - 1.75*W_th)^2
+    if (W1_tip/W_th > 1.75) && (dH_diff < 0.5*(W1_tip - 1.75*W_th)^2)
             dH_diff = 0.5*(W1_tip - 1.75*W_th)^2;
-        end
     end
+   
+    % % choke losses
+    
+    % A_th_star = m_dot/rho1/sqrt(gamma*R*T1);
+    % C_r = sqrt(A1*cos(beta1_geom_mean)/A_th);
+    % if C_r > 1-(A1*cos(beta1_geom_mean)/A_th -1)^2
+    %     C_r = 1-(A1*cos(beta1_geom_mean)/A_th -1)^2;
+    % end
+    % X = 11 - 10*(C_r*A_th)/A_th_star;
+    % if X<=0
+    %     dH_choke = 0;
+    % else 
+    %     dH_choke = 1/2*W1_mean^2*(0.05*X+X^7);
+    % end
+
+    
 
     %%% PARASSITIC
     % disk friction  (Daily and Nece)
@@ -322,7 +326,7 @@ while abs(err_eta_new) > 1e-6
     
 
     % AGGIUNGERE dH_diff
-    dH_tot_internal =  dH_fr + + dH_bl + dH_mix + dH_cl + dH_choke;
+    dH_tot_internal =  dH_fr + + dH_bl + dH_mix + dH_cl + dH_diff;
     dH_tot_parassitic = dH_disk + dH_rec + dH_leak;
     dH_tot = dH_tot_internal + dH_tot_parassitic;
 
