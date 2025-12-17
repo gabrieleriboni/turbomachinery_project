@@ -6,3 +6,4 @@
 
 -dai calcoli abbiamo un unshrouded poi confermato da calcoli successivi
 -da paper china il Set 1 è quello ottimale dato il nostro M1_w_tip
+-sistemare solidity con ciclo for, non cambiare thickness

@@ -128,6 +128,7 @@ mer_grad = D1_t_opt/D2; % check [0.5-0.7]
 b1 = R1_t_opt - R1_h;
 R1_m = 1/2 * (R1_t_opt + R1_h);
 D1_m = R1_m * 2;
+A1 = pi*D1_m*b1;
 
 % velocity triangles 1
 U1_tip = omega * R1_t_opt;
@@ -208,7 +209,6 @@ while abs(err_eta_new) > 1e-6
 
     if mod(N_bl,2)==1
         N_bl = N_bl + 1;
-
     end
 
 
@@ -231,8 +231,8 @@ while abs(err_eta_new) > 1e-6
 
     %% rotor losses
 
-    % incidence=0 per costruzione
-
+    % incidence=0 per costruzione ma non off-design
+    
     %%% IMPELLER INTERNAL
     % skin friction (Jansen, 1967)
     visc_din1 = 1.76e-05; %sutherland
@@ -270,18 +270,37 @@ while abs(err_eta_new) > 1e-6
     else
         W_sep = W2*D_eq*0.5;
     end
-    t_te = 2e-3; % CONTROLLARE
+    t_te = 2e-3; % imposto da geometria
     eps2 = 1- (N_bl * t_te)/(pi*D2);
     A2 = pi*b2*D2*eps2;
     W_out = sqrt((V2_meridional*A2/(pi*D2*b2))^2+W1_mean_t^2);
     dH_mix = 1/2 * (W_sep - W_out)^2;
 
-    % % entrance diffusion
-    % pitch = pi*D1_m/N_bl-t; %%%CHIEDERE, è diversa dall's di prima
-    % throat_opening = pitch*cos(beta1_geom_mean);
-    % A_th_geom = throat_opening*b1;
-    % A_th = A_th_geom *0.97;
-    % dH_diff = 0.4*(W1 - W2_th)^2;
+    % entrance diffusion (Aungier)
+    pitch = pi*D1_m/N_bl - t;
+    A_th_geom = pitch * cos(beta1_geom_mean)*b1;
+    A_th = 0.97 * A_th_geom;
+    W_th = m_dot/rho1/A_th;
+    dH_diff = 0.4*(W1_mean - W_th)^2;
+    if (W1_tip/W_th > 1.75) && (dH_diff < 0.5*(W1_tip - 1.75*W_th)^2)
+            dH_diff = 0.5*(W1_tip - 1.75*W_th)^2;
+    end
+   
+    % % choke losses
+    
+    % A_th_star = m_dot/rho1/sqrt(gamma*R*T1);
+    % C_r = sqrt(A1*cos(beta1_geom_mean)/A_th);
+    % if C_r > 1-(A1*cos(beta1_geom_mean)/A_th -1)^2
+    %     C_r = 1-(A1*cos(beta1_geom_mean)/A_th -1)^2;
+    % end
+    % X = 11 - 10*(C_r*A_th)/A_th_star;
+    % if X<=0
+    %     dH_choke = 0;
+    % else 
+    %     dH_choke = 1/2*W1_mean^2*(0.05*X+X^7);
+    % end
+
+    
 
     %%% PARASSITIC
     % disk friction  (Daily and Nece)
@@ -302,8 +321,10 @@ while abs(err_eta_new) > 1e-6
     % leakage (Jansen)
     dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t_opt-R1_h)/(R2-R1_t_opt))/(1+rho2/rho)*V2_tg*V1);
 
+    
+
     % AGGIUNGERE dH_diff
-    dH_tot_internal =  dH_fr + + dH_bl + dH_mix + dH_cl;
+    dH_tot_internal =  dH_fr + + dH_bl + dH_mix + dH_cl + dH_diff;
     dH_tot_parassitic = dH_disk + dH_rec + dH_leak;
     dH_tot = dH_tot_internal + dH_tot_parassitic;
 
