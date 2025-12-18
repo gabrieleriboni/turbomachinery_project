@@ -31,6 +31,13 @@ cp = cp_exp/Mm * 1e6;
 cv = cv_exp/Mm * 1e6;
 gamma = cp_exp/cv_exp;
 R = cp-cv; % kJ/(mol.K)
+%%% Sutherland's Law for Ammonia)
+mu_0_NH3 = 9.82e-6;   % Viscosity at reference Temp [Pa s]
+T_0_NH3  = 293.15;    % Reference Temp [K]
+S_NH3    = 370;       % Sutherland Constant [K]
+
+% Function Handle: mu_gas(T)
+mu_NH3 = @(T) mu_0_NH3 * (T./T_0_NH3).^(1.5) .* (T_0_NH3 + S_NH3) ./ (T + S_NH3);
 
 %%% assumptions %%%
 
@@ -61,14 +68,14 @@ eta_c_vect = [eta_c];
 err_tot_vect = [err_o];
 m = 0;
 iter_tot = [m];
-
+relaxation_main = 0.5;
 while abs(err_tot_vect(end))>1e-5
 %% iterative process
 
 %%% input
-
+eta_c = eta_c_vect(end);
 D2 = Ds * sqrt(Q_in)/(dht_is^(1/4));
-L = gamma * R/(gamma -1) * Tt1/eta_c_vect(end) * (beta_tt ^((gamma - 1)/gamma) -1);
+L = gamma * R/(gamma -1) * Tt1/eta_c * (beta_tt ^((gamma - 1)/gamma) -1);
 psi = L/omega^2/D2^2;  %unshrouded
 U2 = omega * D2/2;
 V2_tg = L/U2;
@@ -80,7 +87,7 @@ err_new = 1;
 err_rho = [err_new];
 i = 0;
 iter = [i];
-relaxation = 1;
+relaxation = 0.8;
 while abs(err_new) > 1e-5
 
     D1_h = 0.2; % assumption
@@ -106,7 +113,7 @@ while abs(err_new) > 1e-5
     P1 = Pt1 * (T1/Tt1)^(gamma/(gamma-1));
 
     rho_new = P1/R/T1;
-    rho_new = rho + relaxation * (rho_new - rho);
+    rho_new = rho_vect(end) + relaxation * (rho_new - rho_vect(end));
     err_new = abs(rho_new - rho)/rho;
     err_rho = [err_rho; err_new];
     rho_vect = [rho_vect; rho_new];
@@ -180,7 +187,7 @@ err_eta_new = 1;
 err_eta = [err_eta_new];
 k = 0;
 iter_eta = [k];
-relaxation2 = 1;
+relaxation2 = 0.8;
 
 while abs(err_eta_new) > 1e-5
     eta_tt = eta_tt_vect(end);
@@ -247,7 +254,7 @@ while abs(err_eta_new) > 1e-5
 
     %%% IMPELLER INTERNAL
     % skin friction (Jansen, 1967)
-    visc_din1 = 1.76e-05; %sutherland
+    visc_din1 = mu_NH3(T1); %sutherland
     % D_h = 4*(2*pi*R2*b2/N_bl)/(2*b2+2*2*pi*R2/N_bl);
     D_h = D2*cos(beta2) / (( N_bl/pi + D2*cos(beta2)/b2 ) + ( 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2) )/( N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2) ) );
     Re_f = U2 * D_h/visc_din1*rho_t1;
@@ -316,7 +323,7 @@ while abs(err_eta_new) > 1e-5
 
     %%% PARASSITIC
     % disk friction  (Daily and Nece)
-    visc_din2 = 2.00e-05; %sutherland
+    visc_din2 = mu_NH3(T2); %sutherland
     Re_df = U2*R2/visc_din2*rho2;
     if Re_df < 3e5
         f_df = 2.67/Re_df^0.5;
@@ -331,7 +338,7 @@ while abs(err_eta_new) > 1e-5
     dH_rec = 0.02*sqrt(tan(alpha_2))*D_factor^2*U2^2;
 
     % leakage (Jansen)
-    dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t_opt-R1_h)/(R2-R1_t_opt))/(1+rho2/rho)*V2_tg*V1);
+    dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t_opt-R1_h)/(R2-R1_t_opt))/(1+rho2/rho1)*V2_tg*V1);
 
     
 
@@ -389,7 +396,7 @@ err_rho3= [errrho3];
 rho3_vect = [rho3];
 V3_vect = [V3];
 iter_rho3 = [j];
-relaxation3 = 1;
+relaxation3 = 0.8;
 
 while abs(err_rho3(end))>1e-5 || abs(err_V3(end))>1e-5
 
@@ -456,7 +463,7 @@ end
 
 %% 4. Vaned Diffuser
 
-C_p = 0.75;     %check
+C_p = 0.8;     %check
 eta_d = 0.9;    %first guess
 P4 = P3 + C_p*(Pt3-P3);
 T4_is = T3*(P4/P3)^((gamma-1)/gamma);
@@ -467,12 +474,12 @@ M4 = V4/sqrt(gamma*R*T4);
 rho4 = P4/(R*T4);
 
 ee = 8;         %check
-AR = 2.8;       %check
 N_bl_d = ceil(360/ee);
 
 H3 = (2*pi*R3*cos(alpha3))/N_bl_d;
 S3 = H3*b3;
-S4 = AR*S3;
+S4 = m_dot / (rho4 * V4 * N_bl_d);
+AR_diff = S4/S3;
 
 L3_b = 13;      %check
 Ld = b3*L3_b;
@@ -485,15 +492,29 @@ Pt4_new = P4*(1+(gamma-1)/2*M4^2)^(gamma/(gamma-1));
 L_is_new = cp*Tt1*((Pt4_new/Pt1)^((gamma-1)/gamma)-1);
 
 eta_new = L_is_new/L;
-
-err_tot = eta_new - eta_c;
+eta_new = eta_c + relaxation_main * (eta_new - eta_c);
+err_tot = abs(eta_new - eta_c)/eta_c;
 err_tot_vect = [err_tot_vect; err_tot];
 eta_c_vect = [eta_c_vect; eta_new];
-iter_tot = [iter_tot, m];
+m = m+1
+fprintf('errore: %.15f\n', err_tot_vect(end));
+iter_tot = [iter_tot; m];
 end
 
-% fare ciclo while su tutto eta
+%% Plot
 
+figure
+semilogy(iter_tot, err_tot_vect, '.-')
+grid on
+title('err_eta_c')
+xlabel('iter')
+ylabel('log(err_{eta_c)')
+figure
+plot(iter_tot, eta_c_vect, '.-')
+grid on
+title('\eta_c')
+xlabel('iter')
+ylabel('\eta_c')
 
 %% Checks
 
@@ -513,6 +534,7 @@ check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'chi',chi, '[0.5-0.6] unshrouded ([0.6-0.7] shrouded)';
     'beta2', beta2_geom_deg, '[-20 -30] unshrouded ([-40 -50] shrouded)';
     'AR', AR, '[0.03-0.15]';
+    'AR_diff', AR_diff, '';
     'blade height (nu)', nu, '[0.3-0.7]';
     'alpha2', rad2deg(alpha_2), '[<80 avoiding recirculation]';
     'mer_grad', mer_grad, '[0.5-0.7]';
@@ -578,5 +600,3 @@ offset2 = 1.5;
 text(V2_meridional/2 + offset2, V2_tg/2 + offset2, 'V_2', 'Color','c');
 text(0, U2/2 + offset2, 'U_2', 'Color','k');
 text(W2_meridional/2, U2 + W2_tg/2 + offset2, 'W_2', 'Color','r');
-
-
