@@ -340,9 +340,6 @@ while abs(err_eta_new) > 1e-5
     % leakage (Jansen)
     dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t_opt-R1_h)/(R2-R1_t_opt))/(1+rho2/rho1)*V2_tg*V1);
 
-    
-
-    % AGGIUNGERE dH_diff
     dH_tot_internal =  dH_inc + dH_fr + dH_bl + dH_mix + dH_cl + dH_diff + dH_choke;
     dH_tot_parassitic = dH_disk + dH_rec + dH_leak;
     dH_tot = dH_tot_internal + dH_tot_parassitic;
