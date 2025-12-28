@@ -8,3 +8,4 @@
 -da paper china il Set 1 è quello ottimale dato il nostro M1_w_tip
 -sistemare solidity con ciclo for, non cambiare thickness
 -controllare VISCOSITà DINAMICA IN 1,2,3
+-riguardare differenza fra parassitic e internal losses, una va in un efficienza l'altra in un'altra
