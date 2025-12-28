@@ -1,6 +1,7 @@
 clear
 close all
 clc
+
 %% input
 beta_tt = 2;
 m_dot = 3; %kg/s
