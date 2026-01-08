@@ -69,6 +69,7 @@ err_tot_vect = [err_o];
 m = 0;
 iter_tot = [m];
 relaxation_main = 0.5;
+fprintf('Inizio ciclo di ottimizzazione generale\n');
 while abs(err_tot_vect(end))>1e-5
     %% iterative process
 
@@ -588,7 +589,7 @@ while abs(err_tot_vect(end))>1e-5
         D_avg = 0.5 * (D4+D5);
        
         Re_avg = rho_avg * V_avg * D_avg/visc_din5;
-        Cf2_vaneless = k*(1.8e5/Re_avg)^0.2;
+        Cf2_vaneless = kk*(1.8e5/Re_avg)^0.2;
         alpha5 = atan(rho5/rho4*tan(alpha4));
         V5_meridional = (V4_meridional*rho4*pi*D4*b4)/(rho5*pi*D5*b5);
         V5_tg = V5_meridional*tan(alpha5);
@@ -629,6 +630,8 @@ while abs(err_tot_vect(end))>1e-5
     m = m+1
     fprintf('errore: %.15f\n', err_tot_vect(end));
     iter_tot = [iter_tot; m];
+    fprintf('Iter: %d | Err: %.5f | Eta_c: %.4f | Eta_stage: %.4f\n', m, err_tot, eta_c, eta_stage_total);
+
 end
 
 %% Plot

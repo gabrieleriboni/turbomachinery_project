@@ -9,3 +9,4 @@
 -sistemare solidity con ciclo for, non cambiare thickness
 -controllare VISCOSITà DINAMICA IN 1,2,3
 -riguardare differenza fra parassitic e internal losses, una va in un efficienza l'altra in un'altra
+-trovato problema al codice: viene negativa la T5 perchè troppo alta V5, trovare alternativa
