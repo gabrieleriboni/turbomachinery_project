@@ -1,240 +1,592 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                       SENSITIVITY ANALYSIS SCRIPT                       %
+%               Optimizing Ds (Diameter) for Maximum Efficiency           %
+%                    WITH INTERMEDIATE PROGRESS PRINTS                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear
 close all
 clc
 
-%% input
-beta_tt = 2;
-m_dot = 3; %kg/s
-Pt1 = 1 * 1e5; % Pa
-Tt1 = 300; %K
-%%% properties gas %%%
-cp_exp = 0.037; 
-cv_exp = 0.028; 
-Mm = 17.03; 
-cp = cp_exp/Mm * 1e6;
-cv = cv_exp/Mm * 1e6;
-gamma = cp_exp/cv_exp;
-R = cp-cv; 
-%%% Sutherland's Law for Ammonia)
-mu_0_NH3 = 9.82e-6;   
-T_0_NH3  = 293.15;    
-S_NH3    = 370;       
-mu_NH3 = @(T) mu_0_NH3 * (T./T_0_NH3).^(1.5) .* (T_0_NH3 + S_NH3) ./ (T + S_NH3);
-%%% assumptions %%%
-rpm = 15000; 
-omega = rpm * 2*pi/60;
-alpha_2 = 70 * pi/180;
-%% balje
-dht_is = gamma * R/(gamma -1) * Tt1 * (beta_tt ^((gamma - 1)/gamma) -1);
-rho_t1 = Pt1/R/Tt1;
-Q_in = m_dot/rho_t1;
-omega_s = omega * sqrt(Q_in)/dht_is^(3/4);
-Ds = 4.5;  
-D2 = Ds * sqrt(Q_in)/(dht_is^(1/4));
-rho_vect = [rho_t1];
-err_new = 1;
-iter = 0;
-relaxation = 0.8;
-while abs(err_new) > 1e-5
-    D1_h = 0.2; 
-    R1_h = D1_h/2;
-    rho = rho_vect(end);
-    cm1_max = sqrt(2*cp*Tt1);
-    r_min = sqrt(m_dot/rho/cm1_max/pi + R1_h^2);
-    R1_t = linspace(r_min*1.000001,R1_h*8, 100000);
-    cm1 = @(r) m_dot ./ (rho * pi * (r.^2 - R1_h^2));
-    T1 = @(r) Tt1 - cm1(r).^2/(2*cp);
-    M1_tip= @(r) sqrt(((omega.*r).^2 + cm1(r).^2) ./ (gamma * R * T1(r)));
-    M1_t_eval = arrayfun(M1_tip,R1_t);
-    [M1_tip_rel, idx] = min(M1_t_eval);
-    R1_t_opt = R1_t(idx);
-    T1 = Tt1 - cm1(R1_t_opt).^2/(2*cp);
-    P1 = Pt1 * (T1/Tt1)^(gamma/(gamma-1));
-    rho_new = P1/R/T1;
-    rho_new = rho_vect(end) + relaxation * (rho_new - rho_vect(end));
-    err_new = abs(rho_new - rho)/rho;
-    rho_vect = [rho_vect; rho_new];
-    iter = iter+1;
-end
-rho1 = rho_vect(end);
+%% SENSITIVITY LOOP SETUP
+Ds_vect = 3.5:0.5:7.5; % Range of Specific Diameters to test
+Eta_results = [];
+U2_results = [];
+D2_results = [];
+b2_results = [];
 
-V1_ref = m_dot / (rho1 * pi * (R1_t_opt^2 - R1_h^2));
-R1_m = (R1_t_opt + R1_h)/2;
-D1_m = R1_m * 2;
-b1 = R1_t_opt - R1_h;
-A1 = pi * D1_m * b1;
-D1_t_opt = R1_t_opt * 2;
-U1_mean = omega * R1_m;
-U1_tip = omega * R1_t_opt;
-U1_hub = omega * R1_h;
-W1_mean = sqrt(U1_mean^2 + V1_ref^2);
-W1_meridional = V1_ref; 
-W1_tip_t = -U1_tip; W1_hub_t = -U1_hub;
-W1_tip = sqrt(W1_tip_t^2 + W1_meridional^2);
-W1_hub = sqrt(W1_hub_t^2 + W1_meridional^2);
-beta1_mean = atan(-U1_mean / V1_ref);
-beta1_tip = atan(W1_tip_t/W1_meridional);
-beta1_hub = atan(W1_hub_t/W1_meridional);
-V1 = V1_ref; 
-T1 = Tt1 - V1^2/(2*cp);
+% Counter per visualizzare il progresso
+count_step = 0;
+total_steps = length(Ds_vect);
 
-%% SETUP SENSITIVITY
-n_sens = 50;
-D2_vec = linspace(D2 * 0.8, D2* 1.2, n_sens);
-eta_sens = zeros(1, n_sens);
-b2_sens  = zeros(1, n_sens);
+fprintf('--------------------------------------------------\n');
+fprintf('       RUNNING SENSITIVITY ANALYSIS (Iterating Ds)      \n');
+fprintf('--------------------------------------------------\n');
 
-for i = 1:n_sens
-    D2_curr = D2_vec(i);
-    R2_curr = D2_curr / 2;
-    U2_curr = omega * R2_curr;
-    eta_tt_guess = 0.85;
-    rho2_guess = rho1 * 1.5; 
-    err_loc = 1;
-    iter_loc = 0;
+for Ds = Ds_vect
+    count_step = count_step + 1;
     
-    while abs(err_loc) > 1e-5 && iter_loc < 100
-        iter_loc = iter_loc + 1;
-        L_req = cp * Tt1/eta_tt_guess * (beta_tt^((gamma-1)/gamma) - 1);
-        V2_tg_curr = L_req / U2_curr;
-        V2_m_curr = V2_tg_curr / tan(alpha_2);
-        V2_curr = sqrt(V2_m_curr^2 + V2_tg_curr^2);
-        W2_tg_curr = V2_tg_curr - U2_curr;
-        W2_curr = sqrt(V2_m_curr^2 + W2_tg_curr^2);
-        Tt2_curr = Tt1 + L_req/cp;
-        T2_curr = Tt2_curr - V2_curr^2/(2*cp);
-        M2_curr = V2_curr / sqrt(gamma * R * T2_curr);
-        Pt2_curr = Pt1 * (1 + eta_tt_guess * L_req/(cp*Tt1))^(gamma/(gamma-1));
-        P2_curr = Pt2_curr / (1 + (gamma-1)/2 * M2_curr^2)^(gamma/(gamma-1));
-        rho2_new = P2_curr / (R * T2_curr);
-        rho2_guess = 0.5 * rho2_guess + 0.5 * rho2_new;
-        b2_curr = m_dot / (rho2_guess * V2_m_curr * pi * D2_curr);
-        beta2_curr = atan(W2_tg_curr / V2_m_curr);
-        beta_av_curr = 0.5 * (beta1_mean + beta2_curr);
-        N_bl_curr = ceil(2*pi*cos(beta_av_curr)/(0.4*log(D2_curr/(D1_m))));
-        if mod(N_bl_curr,2)==1
-            N_bl_curr = N_bl_curr + 1;
+    % --- CONTROLLO TESTUALE INIZIO ITERAZIONE ---
+    fprintf('\n[Step %d/%d] Elaborazione Ds = %.2f in corso...\n', count_step, total_steps, Ds);
+    
+    % Reset loop variables for each Ds run
+    % (Exact constants from untitled.m)
+    beta_tt = 2;
+    m_dot = 3; %kg/s
+    Pt1 = 1 * 1e5; % Pa
+    Tt1 = 300; %K
+    rpm = 15000;
+    
+    % Properties
+    cp_exp = 0.037; cv_exp = 0.028; Mm = 17.03;
+    cp = cp_exp/Mm * 1e6; cv = cv_exp/Mm * 1e6;
+    gamma = cp_exp/cv_exp; R = cp-cv;
+    mu_0_NH3 = 9.82e-6; T_0_NH3 = 293.15; S_NH3 = 370;
+    mu_NH3 = @(T) mu_0_NH3 * (T./T_0_NH3).^(1.5) .* (T_0_NH3 + S_NH3) ./ (T + S_NH3);
+    
+    omega = rpm * 2*pi/60;
+    alpha2 = 74 * pi/180;
+    
+    % Balje Input
+    dht_is = gamma * R/(gamma -1) * Tt1 * (beta_tt ^((gamma - 1)/gamma) -1);
+    rho_t1 = Pt1/R/Tt1;
+    Q_in = m_dot/rho_t1;
+    omega_s = omega * sqrt(Q_in)/dht_is^(3/4);
+    
+    % Note: Ds is now the loop variable, not fixed at 5.0
+    eta_c = 0.82; % First guess
+    
+    err_tot_vect = [1];
+    eta_c_vect = [eta_c];
+    m = 0;
+    iter_tot = [m];
+    relaxation_main = 0.5;
+    
+    % --- START EXACT COPY OF DESIGN LOOP ---
+    while abs(err_tot_vect(end))>1e-5 && m < 50 % Added safety iter limit
+        %% iterative process
+        %%% input
+        eta_c = eta_c_vect(end);
+        D2 = Ds * sqrt(Q_in)/(dht_is^(1/4));
+        L = gamma * R/(gamma -1) * Tt1/eta_c * (beta_tt ^((gamma - 1)/gamma) -1);
+        psi = L/omega^2/D2^2;  %unshrouded
+        U2 = omega * D2/2;
+        V2_tg = L/U2;
+        tau = V2_tg/U2; %backwards
+        M2_u = U2/sqrt(gamma * R * Tt1);
+        rho_vect = [rho_t1];
+        err_new = 1;
+        err_rho = [err_new];
+        i = 0;
+        iter = [i];
+        relaxation = 0.8;
+        while abs(err_new) > 1e-5
+            D1_h = 0.2; % assumption
+            R1_h = D1_h/2;
+            rho = rho_vect(end);
+            cm1_max = sqrt(2*cp*Tt1);
+            r_min = sqrt(m_dot/rho/cm1_max/pi + R1_h^2);
+            R1_t = linspace(r_min*1.000001,R1_h*8, 100000);
+            cm1 = @(r) m_dot ./ (rho * pi * (r.^2 - R1_h^2));
+            T1 = @(r) Tt1 - cm1(r).^2/(2*cp);
+            M1_tip= @(r) sqrt(((omega.*r).^2 + cm1(r).^2) ./ (gamma * R * T1(r)));
+            M1_t_eval = arrayfun(M1_tip,R1_t);
+            [M1_tip_rel, idx] = min(M1_t_eval);
+            R1_t_opt = R1_t(idx);
+            D1_t_opt = R1_t_opt*2;
+            T1 = Tt1 - cm1(R1_t_opt).^2/(2*cp);
+            P1 = Pt1 * (T1/Tt1)^(gamma/(gamma-1));
+            rho_new = P1/R/T1;
+            rho_new = rho_vect(end) + relaxation * (rho_new - rho_vect(end));
+            err_new = abs(rho_new - rho)/rho;
+            err_rho = [err_rho; err_new];
+            rho_vect = [rho_vect; rho_new];
+            i = i+1;
+            iter = [iter; i];
         end
-        t_curr = max(0.003 * D2_curr, 0.0025);
-        
-        D2 = D2_curr; R2 = R2_curr; U2 = U2_curr;
-        b2 = b2_curr; N_bl = N_bl_curr; t = t_curr;
-        V2_tg = V2_tg_curr; V2_meridional = V2_m_curr; V2 = V2_curr;
-        W2 = W2_curr; beta2 = beta2_curr;
-        T2 = T2_curr; L = L_req; rho2 = rho2_guess;
-        L_eul = U2 * V2_tg;
+        rho1 = rho_vect(end);
+        nu = D1_h/D1_t_opt;   
+        mer_grad = D1_t_opt/D2; 
+        b1 = R1_t_opt - R1_h;
+        R1_m = 1/2 * (R1_t_opt + R1_h);
+        D1_m = R1_m * 2;
+        A1 = pi*D1_m*b1;
+        % velocity triangles 1
+        U1_tip = omega * R1_t_opt;
+        U1_mean = omega * R1_m;
+        U1_hub = omega * R1_h;
+        W1_tip_t = -U1_tip;
+        W1_mean_t = -U1_mean;
+        W1_hub_t = -U1_hub;
+        W1_meridional = m_dot/rho/pi/(R1_t_opt^2-R1_h^2);
+        W1_tip = sqrt(W1_tip_t^2 + W1_meridional^2);
+        W1_mean = sqrt(W1_mean_t^2 + W1_meridional^2);
+        W1_hub = sqrt(W1_hub_t^2 + W1_meridional^2);
+        beta1_tip = atan(W1_tip_t/W1_meridional);
+        beta1_mean = atan(W1_mean_t/W1_meridional);
+        beta1_hub = atan(W1_hub_t/W1_meridional);
+        V1 = W1_meridional;
+        % velocity triangles 2
+        V2_meridional = V2_tg/tan(alpha2);
+        V2 = V2_tg/sin(alpha2);
+        W2_tg = V2_tg - U2;
+        W2_meridional = V2_meridional;
+        W2 = sqrt(W2_meridional^2 + W2_tg^2);
+        L_eul = U2*V2_tg;
         phi = 4 * Q_in/(pi*U2*D2^2);
-        beta1_geom_mean = atan(1 - t*N_bl/(2*pi*R1_m)*tan(beta1_mean));
-        beta1_geom_tip = atan(1 - t*N_bl/(2*pi*R1_t_opt)*tan(beta1_tip)); 
-        mu_slip = 1 - 0.63*pi/N_bl;
-        V2_tg_inf = (1- mu_slip)*U2 + V2_tg;
-        beta2_geom = atan((V2_tg_inf - U2)/V2_meridional);
-        solidity = 1/0.4;
-        dtheta = log(D2/D1_m) * tan(beta2);
-        c = R2 * dtheta/(sin(beta2));
-        s = c/solidity;
         
-        % Mapping variabili inlet mancanti per il blocco perdite
-        W1_mean_t = -U1_mean; 
+        %% 2. Impeller Outlet
+        eta_tt_guess = 0.90;
+        eta_tt_vect = [eta_tt_guess];
+        err_eta_new = 1;
+        err_eta = [err_eta_new];
+        k = 0;
+        iter_eta = [k];
+        relaxation2 = 0.8;
+        while abs(err_eta_new) > 1e-5
+            eta_tt = eta_tt_vect(end);
+            DR = abs(W1_mean_t) / W2;
+            beta2 = atan(W2_tg/V2_meridional);
+            beta2_deg = beta2*180/pi; 
+            Tt2 = L/cp + Tt1;
+            T2 = Tt2 - V2^2/(2*cp);
+            M2 = V2/sqrt(gamma * R *T2);
+            chi = cp*(T2-T1)/L;
+            Pt2 = Pt1 * (1 + (eta_tt*L)/(cp*Tt1))^(gamma/(gamma - 1));
+            P2 = Pt2/(1 + (gamma-1)/2 * M2^2)^(gamma/(gamma - 1));
+            rho2 = P2/R/T2;
+            b2 = m_dot/(rho2*V2_meridional*pi*D2);
+            AR = b2/D2; 
+            solidity = 1/0.4;
+            dtheta = log(D2/D1_m) * tan(beta2);
+            R2 = D2/2;
+            c = R2 * dtheta/(sin(beta2));
+            s = c/solidity;
+            t = 0.003*D2;
+            beta_av = 0.5 * (beta1_mean + beta2);
+            % Stodola formula
+            N_bl = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
+            if mod(N_bl,2)==1
+                N_bl = N_bl + 1;
+            end
+            mu = 1 - 0.63*pi/N_bl; 
+            V2_tg_inf = (1- mu)*U2 + V2_tg;
+            W2_tg_inf = V2_tg_inf - U2;
+            beta2_geom = atan(W2_tg_inf/W2_meridional);
+            beta2_geom_deg = beta2_geom *180/pi; 
+            beta1_geom_tip = atan(1-t*N_bl/(2*pi*R1_t_opt)*tan(beta1_tip));
+            beta1_geom_mean = atan(1-t*N_bl/(2*pi*R1_m)*tan(beta1_mean));
+            beta1_geom_hub = atan(1-t*N_bl/(2*pi*R1_h)*tan(beta1_hub));
+            %% rotor losses
+            % incidence=0 per costruzione ma non off-design
+            dH_inc = 0.4*(W1_mean - V1/cos(beta1_mean))^2;
+            %%% IMPELLER INTERNAL
+            % skin friction (Jansen, 1967)
+            visc_din1 = mu_NH3(T1); 
+            
+            % Hydraulic diameter (Zhang et al. Eq 9)
+            s1 = (pi * D1_m / N_bl) * cos(beta1_mean);
+            term_out = N_bl/pi + D2*cos(beta2)/b2;
+            term_in_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+            term_in_den = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+            D_h = D2*cos(beta2) / (term_out + term_in_num/term_in_den);
+            Re_f = U2 * D_h/visc_din1*rho_t1;
+            Cf = 0.0412 * Re_f ^(-0.1925);
+            Lz = 0.08 + 3.16*phi; 
+            lb = pi/8 *(D2- 1/2 * (D1_t_opt+D1_h) - b2 + 2*Lz)*(2/((cos(beta1_tip)+cos(beta1_hub))/2 + (cos(beta2))));
+            W12_av = 1/4 * (W1_hub + W1_tip + 2*W2);
+            dH_fr = (2 * Cf * W12_av^2 * lb)/(D_h);
+            % clearance (Jansen)
+            eps = 5e-4;
+            dH_cl = 0.6 * eps / b2 * V2_tg * ( 4*pi / (b2 * N_bl) * (R1_t_opt^2 - R1_h^2) / (R2 - R1_t_opt) *V2_tg * V1 / (1 + rho2 / rho1) )^(1/2);
+            % blade loading (Aungier, 1995) 
+            dW = 2*pi*D2*V2_tg/(N_bl*lb);
+            dH_bl = 1/48*dW^2;
+            % wake mixing (Aungier, 1995)
+            W_max = 0.5*(W1_mean + W2 + dW);
+            D_eq = W_max/W2;
+            if D_eq <= 2
+                W_sep = W2;
+            else
+                W_sep = W2*D_eq*0.5;
+            end
+            t_te = 2e-3; 
+            eps2 = 1- (N_bl * t_te)/(pi*D2);
+            A2 = pi*b2*D2*eps2;
+            W_out = sqrt((V2_meridional*A2/(pi*D2*b2))^2+W2_tg^2); % Corrected mixing logic
+            dH_mix = 1/2 * (W_sep - W_out)^2;
+            % entrance diffusion (Aungier)
+            A_th_geom = s1 * b1; % Corrected s1 logic
+            A_th = 0.97 * A_th_geom;
+            W_th = m_dot/N_bl/rho1/A_th;
+            dH_diff = 0.4*(W1_mean - W_th)^2;
+            if (W1_tip/W_th > 1.75) && (dH_diff < 0.5*(W1_tip - 1.75*W_th)^2)
+                dH_diff = 0.5*(W1_tip - 1.75*W_th)^2;
+            end
+            % choke losses
+            M1_mean_rel = W1_mean/sqrt(gamma*R*T1);
+            A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/(2*(gamma-1)))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
+            C_r = sqrt((A1/N_bl-t)*cos(beta1_geom_mean)/A_th);
+            if C_r > 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2
+                C_r = 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2;
+            end
+            X = 11 - 10*(C_r*A_th)/A_th_star;
+            if X<=0
+                dH_choke = 0;
+            else
+                dH_choke = 1/2*W1_mean^2*(0.05*X+X^7);
+            end
+            %%% PARASSITIC
+            % disk friction  (Daily and Nece)
+            visc_din2 = mu_NH3(T2); 
+            Re_df = U2*R2/visc_din2*rho2;
+            if Re_df < 3e5
+                f_df = 2.67/Re_df^0.5;
+            else
+                f_df = 0.0622/Re_df^0.2;
+            end
+            dH_disk = f_df * (rho1 + rho2)*R2^2*U2^3/(8*m_dot);
+            % recirculation (Coppage)
+            D_factor = 1 - W2/W1_tip + 0.75*L_eul*W2/((N_bl/pi*(1-D1_t_opt/D2)+2*D1_t_opt/D2)*W1_tip*U2^2);
+            dH_rec = 0.02*sqrt(tan(alpha2))*D_factor^2*U2^2;
+            % leakage (Jansen)
+            dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t_opt-R1_h)/(R2-R1_t_opt))/(1+rho2/rho1)*V2_tg*V1);
+            dH_tot_internal =  dH_inc + dH_fr + dH_bl + dH_mix + dH_cl + dH_diff + dH_choke;
+            dH_tot_parassitic = dH_disk + dH_rec + dH_leak;
+            eta_tt_new = (L_eul - dH_tot_internal)/(L_eul + dH_tot_parassitic);
+            eta_tt_new = eta_tt + relaxation2 * (eta_tt_new - eta_tt);
+            eta_tt_vect = [eta_tt_vect; eta_tt_new];
+            err_eta_new = abs(eta_tt_new - eta_tt)/eta_tt;
+            err_eta = [err_eta; err_eta_new];
+            k = k+1;
+            iter_eta = [iter_eta; k];
+        end
+        %% 3. Vaneless Diffuser
+        if rad2deg(alpha2)>= 72
+            alpha3_deg = 72 + (rad2deg(alpha2)-72)/4;
+        else
+            alpha3_deg = 72;
+        end
+        R3 = R2*( 1 + (90 - alpha3_deg)/360 + M2^2/15);
+        D3 = R3*2;
+        alpha3 = deg2rad(alpha3_deg);
+        Tt3 = Tt2;
+        visc_din3 = visc_din2;
+        rho3 = rho2;  %first guess
+        V3 = V2;      %first guess
+        k_vld = 0.01;
+        errV3 = 1;
+        errrho3 = 1;
+        j = 0;
+        err_V3 = [errV3];
+        err_rho3= [errrho3];
+        rho3_vect = [rho3];
+        V3_vect = [V3];
+        iter_rho3 = [j];
+        relaxation3 = 0.8;
+        while abs(err_rho3(end))>1e-5 || abs(err_V3(end))>1e-5
+            rho3 = rho3_vect(end);
+            V3 = V3_vect(end);
+            rho_avg = 0.5*(rho2 + rho3);
+            V_avg = 0.5 * (V2 + V3);
+            D_avg = 0.5 * (D2+D3);
+            Re_avg = rho_avg * V_avg * D_avg/visc_din3;
+            Cf_vaneless = k_vld*(1.8e5/Re_avg)^0.2;
+            b3 = tan(alpha3)/tan(alpha2) * b2*rho2/rho3;  %pinch
+            V3_meridional = (V2_meridional*rho2*pi*D2*b2)/(rho3*pi*D3*b3);
+            V3_tg = V3_meridional*tan(alpha3);
+            V3_new = V3_meridional/cos(alpha3);
+            errV3_new = abs(V3_new-V3)/V3;
+            err_V3 = [err_V3; errV3_new];
+            V3_vect = [V3_vect; V3_new];
+            V3 = V3_vect(end);
+            dH_t_VLD = Cf_vaneless * V2^2 * R2 *(1-(R2/R3)^1.5)/(1.5*b2*cos(alpha2));
+            T3 = Tt3-1/(2*cp)*V3^2;
+            M3 = V3/sqrt(gamma*R*T3);
+            Tt3_is = Tt3-dH_t_VLD/cp;
+            Pt3 = Pt2*(Tt3_is/Tt2)^(gamma/(gamma-1));
+            P3 = Pt3/(1+(gamma-1)/2*M3^2)^(gamma/(gamma-1));
+            rho3_new = P3/(T3*R);
+            rho3_new = rho3 + relaxation3 * (rho3_new - rho3);
+            errrho3_new = abs(rho3_new - rho3)/rho3;
+            err_rho3 = [err_rho3; errrho3_new];
+            rho3_vect = [rho3_vect; rho3_new];
+            j = j+1;
+            iter_rho3 = [iter_rho3; j];
+        end
+        %% 4. Vaned Diffuser (5 exit)
+        N_bl_VD = 29;
+        while gcd(N_bl_VD, N_bl) ~= 1
+            N_bl_VD = N_bl_VD - 1;
+        end
+        alpha3_geom = alpha3 - 0.5*pi/180;
+        A3 = 2*pi*R3*b3;
+        R5 = R2 * (1.55 + phi*4/pi);
+        Ld = R5 - R2;
+        AR_d = R5/R2;
+        R4 = 1.33*R3;
+        D4 = R4 *2;
+        b4 = b3;
+        t_bl_in = 0.001;
+        t_bl_out = 0.015;
+        alpha4_geom = asin( (R3/R4) * sin(alpha3_geom) ); %wedge
+        alpha_mean_geom = 0.5 * (alpha3_geom + alpha4_geom);
+        camber = (2-(alpha_mean_geom-alpha3_geom)/(alpha4_geom-alpha3_geom))/3;
+        sigma = N_bl_VD * (R4-R3)/(2*pi*R3*cos(alpha_mean_geom));
+        theta = alpha4_geom - alpha3_geom;
+        delta_s = (theta * (0.92*(camber)^2+0.02*alpha4_geom))/(sqrt(sigma)-0.02*theta);
+        d_delta_i = exp(((1.5-(90-alpha3_geom)/60)^2-3.3)*sigma);
+        alpha4 = alpha4_geom - delta_s - d_delta_i * (alpha3_geom - alpha3);
+        Pitch3 = 2*pi*R3 / N_bl_VD;
+        Pitch4 = 2*pi*R4 / N_bl_VD;
+        W3 = Pitch3 * cos(alpha3_geom) - t_bl_in;
+        W4 = Pitch4 * cos(alpha4_geom) - t_bl_out;
+        Lb = 2*(R4 - R3) / (cos(alpha3_geom)+cos(alpha4_geom));
+        theta_c = atan((W4 - W3) / (2*Lb));
+        rho4 = rho3; % first guess
+        V4 = V3; % first guess
+        err_rho4 = 1;
+        it_vd = 0;
+        while err_rho4 > 1e-5 && it_vd < 50
+            rho4_old = rho4;
+            
+            V4_meridional = m_dot / (rho4_old * N_bl_VD * W4 * b4);
+            V4 = V4_meridional / cos(alpha4);
+            V4_tg = V4 * sin(alpha4);
+            
+            % losses
+            % incidence (Zhang et al. Eq 53-55)
+            A_inlet_VD = W3 * b3; 
+            cos_alpha_th = cos(alpha3)^2/cos(alpha3_geom); % Note: alpha3 is flow angle, but here used for throat ratio scaling
+            % Better implementation using geometric areas directly:
+            A_inlet_geom = 2 * pi * R3 * b3;
+            A_throat_geom = N_bl_VD * W3 * b3;
+            cos_alpha_th_geom = A_throat_geom / A_inlet_geom;
+            
+            cos_alpha_opt = sqrt(cos(alpha3_geom) * cos_alpha_th_geom);
+            V3_opt = V3_meridional / cos_alpha_opt;
+            
+            dH_inc_VD = 0.4 * (V3 - V3_opt)^2;
+            % friction
+            Dh_in = 2 * (W3 * b3) / (W3 + b3);
+            Dh_out = 2 * (W4 * b4) / (W4 + b4);
+            Dh_avg_VD = 0.5 * (Dh_in + Dh_out);
+            Cf_vaned = k_vld*(1.8e5/Re_avg)^0.2;
+            dH_fr_VD = Cf_vaned * Lb/Dh_avg_VD*((V3+V4)/2)^2;
+            % choke losses (Zhang et al. Eq 57-59)
+            A_th_VD_geom = N_bl_VD * W3 * b3; % Geometric Throat Area
+            A_inlet_VD_geom = 2 * pi * R3 * b3; % Inlet Annulus Area
+            
+            % Cr_rvd (Eq. 59): Ratio of projected inlet area to throat area
+            % Note: Using alpha3_geom (Blade Angle) as per paper's alpha_4b
+            Cr_VD = sqrt( (A_inlet_VD_geom * cos(alpha3_geom)) / A_th_VD_geom );
+            
+            % Critical Area for Sonic Flow (A*)
+            M3_abs = V3/sqrt(gamma*R*T3);
+            A_th_star = M3_abs * A_th_VD_geom / ( (2/(gamma+1))*(1+(gamma-1)/2*M3_abs^2) )^((gamma+1)/(2*(gamma-1)));
+            
+            % Choke Parameter X (Eq. 58)
+            X_VD = 11 - 10 * (Cr_VD * A_th_VD_geom) / A_th_star;
+            
+            if X_VD <= 0
+                dH_choke_VD = 0;
+            else
+                dH_choke_VD = 1/2 * V3^2 * (0.05 * X_VD + X_VD^7);
+            end
+            % blockage
+            Cl = 1;
+            C_theta = 1;
+            k1 = 0.2*(1-1/Cl/C_theta);
+            k2 = 2*theta_c/125/C_theta*(1-2*theta_c/22*C_theta);
+            Cr = 1/2*V3_meridional*cos(alpha4_geom)/(V4_meridional*cos(alpha3_geom))+1;
+            B4 = (k1+k2*(Cr^2-1))*Lb/W4;
+            dH_bl_VD = 1/2*(V4/(1-B4)-V4)^2;
+            % mix
+            V_sep = V4/(1+2*C_theta);
+            V4_meridional_mixed = m_dot / (rho4 * 2 * pi * R4 * b4);
+            V_out = sqrt(V4_meridional_mixed^2 + V4_tg^2);
+            dH_mix_VD = 0.5 * (V_sep - V_out)^2;
+            dH_t_VD = dH_inc_VD + dH_fr_VD + dH_choke_VD + dH_bl_VD + dH_mix_VD;
+            eta_int_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD)/(L_eul + dH_tot_parassitic);
+            Tt4 = Tt2; 
+            T4 = Tt4 - V4^2 / (2*cp); 
+            Pt4 = Pt1 * (1 + eta_int_tt * ((Tt2 - Tt1)/Tt1))^(gamma/(gamma-1));
+            M4 = V4/sqrt(gamma*R*T4);
+            P4 = Pt4 / (1 + (gamma-1)/2 * M4^2)^(gamma/(gamma-1));
+            rho4 = P4 / (R*T4);
+            
+            err_rho4 = abs(rho4 - rho4_old)/rho4_old;
+            it_vd = it_vd + 1;
+        end
+        dv = 2*pi*(R3*V3_tg-R4*V4_tg)/(N_bl_VD*Lb);
+        L_check = dv/(V3-V4);
+        AR_VD = W4/W3;
+        pitch_4 = 2 * pi * R4 / N_bl_VD;
+        S4 = b4 * (pitch_4 * cos(alpha4));
+        %% altro vaneless
         
-        dH_inc = 0.4*(W1_mean - V1/cos(beta1_mean))^2;
-        %%% IMPELLER INTERNAL
-        % skin friction (Jansen, 1967)
-        visc_din1 = mu_NH3(T1); %sutherland
-        % D_h = 4*(2*pi*R2*b2/N_bl)/(2*b2+2*2*pi*R2/N_bl);
-        D_h = D2*cos(beta2) / (( N_bl/pi + D2*cos(beta2)/b2 ) + ( 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2) )/( N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2) ) );
-        Re_f = U2 * D_h/visc_din1*rho_t1;
-        Cf = 0.0412 * Re_f ^(-0.1925);
-        Lz = 0.08 + 3.16*phi; %computed as aungier
-        %Lz = 0.1 + 2*phi by Hamid Hazby (sembra meglio sperimentalmente)
-        lb = pi/8 *(D2- 1/2 * (D1_t_opt+D1_h) - b2 + 2*Lz)*(2/((cos(beta1_tip)+cos(beta1_hub))/2 + (cos(beta2))));
-        W12_av = 1/4 * (W1_hub + W1_tip + 2*W2);
-        dH_fr = (2 * Cf * W12_av^2 * lb)/(D_h);
-        % clearance (Jansen)
-        eps = 5e-4;
-        dH_cl = 0.6 * eps / b2 * V2_tg * ( 4*pi / (b2 * N_bl) * (R1_t_opt^2 - R1_h^2) / (R2 - R1_t_opt) *V2_tg * V1 / (1 + rho2 / rho1) )^(1/2);
-        % blade loading (Aungier, 1995) assumption of no inlet swirl
-        dW = 2*pi*D2*V2_tg/(N_bl*lb);
-        dH_bl = 1/48*dW^2;
-        % wake mixing (Aungier, 1995)
-        W_max = 0.5*(W1_mean + W2 + dW);
-        D_eq = W_max/W2;
-        if D_eq <= 2
-            W_sep = W2;
-        else
-            W_sep = W2*D_eq*0.5;
+        D5 = R5*2;
+        Tt5 = Tt4;
+        b5 = b4;
+        visc_din5 = mu_NH3(T4);
+        rho5 = rho4;  %first guess
+        V5 = V4;      %first guess
+        kk = 0.01;
+        errV5 = 1;
+        errrho5 = 1;
+        jj = 0;
+        err_V5 = [errV5];
+        err_rho5= [errrho5];
+        rho5_vect = [rho5];
+        V5_vect = [V5];
+        iter_rho5 = [jj];
+        relaxation5 = 0.8;
+        while abs(err_rho5(end))>1e-5 || abs(err_V5(end))>1e-5
+            rho5 = rho5_vect(end);
+            V5 = V5_vect(end);
+            rho_avg = 0.5*(rho4 + rho5);
+            V_avg = 0.5 * (V4 + V5);
+            D_avg = 0.5 * (D4+D5);
+           
+            Re_avg = rho_avg * V_avg * D_avg/visc_din5;
+            Cf2_vaneless = kk*(1.8e5/Re_avg)^0.2;
+            alpha5 = atan(rho5/rho4*tan(alpha4));
+            V5_meridional = (V4_meridional*rho4*pi*D4*b4)/(rho5*pi*D5*b5);
+            V5_tg = V5_meridional*tan(alpha5);
+            V5_new = V5_meridional/cos(alpha5);
+            errV5_new = abs(V5_new-V5)/V5;
+            err_V5 = [err_V5; errV5_new];
+            V5_vect = [V5_vect; V5_new];
+            V5 = V5_vect(end);
+            dH_t_2VLD = Cf2_vaneless * V4^2 * R4 *(1-(R4/R5)^1.5)/(1.5*b4*cos(alpha4));
+            T5 = Tt5-1/(2*cp)*V5^2;
+            M5 = V5/sqrt(gamma*R*T5);
+            Tt5_new = Tt5 - dH_t_2VLD/cp;
+            Pt5 = Pt4*(Tt5_new/Tt2)^(gamma/(gamma-1));
+            P5 = Pt5/(1+(gamma-1)/2*M5^2)^(gamma/(gamma-1));
+            rho5_new = P5/(T5*R);
+            rho5_new = rho5 + relaxation5 * (rho5_new - rho5);
+            errrho5_new = abs(rho5_new - rho5)/rho5;
+            err_rho5 = [err_rho5; errrho5_new];
+            rho5_vect = [rho5_vect; rho5_new];
+            jj = jj+1;
+            iter_rho5 = [iter_rho5; jj];
         end
-        t_te = 2e-3; % imposto da geometria
-        eps2 = 1- (N_bl * t_te)/(pi*D2);
-        A2 = pi*b2*D2*eps2;
-        W_out = sqrt((V2_meridional*A2/(pi*D2*b2))^2+W1_mean_t^2);
-        dH_mix = 1/2 * (W_sep - W_out)^2;
-        % entrance diffusion (Aungier)
-        % pitch = pi*D1_m/N_bl - t;
-        A_th_geom = s * cos(beta1_geom_mean)*b1;
-        A_th = 0.97 * A_th_geom;
-        W_th = m_dot/N_bl/rho1/A_th;
-        dH_diff = 0.4*(W1_mean - W_th)^2;
-        if (W1_tip/W_th > 1.75) && (dH_diff < 0.5*(W1_tip - 1.75*W_th)^2)
-            dH_diff = 0.5*(W1_tip - 1.75*W_th)^2;
+         C_p = (P5-P3)/(Pt3-P3);
+        %% Volute
+        SP = 1.1;
+        K_friction = 0.005;
+        r6 = R5 * 1.1;
+        rho6 = rho5;
+        err_vol = 1;
+        iter_vol = 0;
+        while err_vol > 1e-4 && iter_vol < 100
+            V6 = (R5 * V5_tg) / (r6 * SP);
+            Tt6 = Tt5;
+            T6 = Tt6 - V6^2 / (2*cp);
+            A6 = m_dot / (rho6 * V6);
+            r_sect = sqrt(A6 / pi);
+            D_throat = 2 * r_sect;
+            r6_new = R5 + r_sect;
+            P_dyn_5 = Pt5 - P5;
+            % losses
+            % Meridional Loss
+            dH_vol_merid = 0.5 * V5_meridional^2;
+            % Tangential Velocity Loss
+            term_sp = 0;
+            if SP >= 1
+                term_sp = (1 - 1/SP^2);
+                dH_vol_tan = 0.5 * (R5/r6) * V5_tg^2 * term_sp * 0.5; % Il fattore 0.5 viene dalla formula (2.107)
+            else
+                term_sp = (1 - 1/SP)^2;
+                dH_vol_tan = (R5/r6) * V5_tg^2 * term_sp * 0.5; % Qui non c'è il fattore 0.5 iniziale nella formula (2.107)
+            end
+            % Skin Friction Loss
+            L_vol = pi * (R5 + r6_new); % Lunghezza media voluta
+            d_H = D_throat;             % Diametro idraulico
+            dH_vol_fric = 2 * K_friction * (L_vol / d_H) * V6^2;
+            % Somma Perdite Voluta
+            dH_vol_tot = dH_vol_merid + dH_vol_tan + dH_vol_fric;
+            Tt6_is = Tt6 - dH_vol_tot / cp;
+            Pt6 = Pt5 * (Tt6_is / Tt5)^(gamma/(gamma-1));
+            M6 = V6 / sqrt(gamma * R * T6);
+            P6 = Pt6 / (1 + (gamma-1)/2 * M6^2)^(gamma/(gamma-1));
+            rho6_new = P6 / (R * T6);
+            err_vol = abs(r6_new - r6)/r6 + abs(rho6_new - rho6)/rho6;
+            r6 = r6_new;
+            rho6 = rho6_new;
+            iter_vol = iter_vol + 1;
         end
-        % choke losses
-        M1_mean_rel = W1_mean/sqrt(gamma*R*T1);
-        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/2*(gamma-1))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
-        C_r = sqrt((A1/N_bl-t)*cos(beta1_geom_mean)/A_th);
-        if C_r > 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2
-            C_r = 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2;
-        end
-        X = 11 - 10*(C_r*A_th)/A_th_star;
-        if X<=0
-            dH_choke = 0;
-        else
-            dH_choke = 1/2*W1_mean^2*(0.05*X+X^7);
-        end
-        %%% PARASSITIC
-        % disk friction  (Daily and Nece)
-        visc_din2 = mu_NH3(T2); %sutherland
-        Re_df = U2*R2/visc_din2*rho2;
-        if Re_df < 3e5
-            f_df = 2.67/Re_df^0.5;
-        else
-            f_df = 0.0622/Re_df^0.2;
-        end
-        dH_disk = f_df * (rho1 + rho2)*R2^2*U2^3/(8*m_dot);
-        % recirculation (Coppage)
-        D_factor = 1 - W2/W1_tip + 0.75*L_eul*W2/((N_bl/pi*(1-D1_t_opt/D2)+2*D1_t_opt/D2)*W1_tip*U2^2);
-        dH_rec = 0.02*sqrt(tan(alpha_2))*D_factor^2*U2^2;
-        % leakage (Jansen)
-        dH_leak = 0.6 * eps/b2*V2*sqrt(4*pi/(b2*N_bl)*((R1_t_opt-R1_h)/(R2-R1_t_opt))/(1+rho2/rho1)*V2_tg*V1);
-        dH_tot_internal =  dH_inc + dH_fr + dH_bl + dH_mix + dH_cl + dH_diff + dH_choke;
-        dH_tot_parassitic = dH_disk + dH_rec + dH_leak;
-        dH_tot = dH_tot_internal + dH_tot_parassitic;
-        eta_new = (L_req - dH_tot) / L_req;
-        err_loc = (eta_new - eta_tt_guess)/eta_tt_guess;
-        eta_tt_guess = eta_tt_guess + 0.5 * (eta_new - eta_tt_guess);
+        %% 7. exit cone
+        AR_cone = 2.3;       % Area Ratio diffusore uscita
+        A7 = A6 * AR_cone;
+        D_exit = sqrt(4 * A7 / pi);
+        rho7 = rho6; 
+        V7 = m_dot / (rho7 * A7);
+        dH_cone = 0.5 * (V6 - V7)^2;
+        Tt7 = Tt6; % Adiabatico
+        Tt7_is = Tt7 - dH_cone / cp; % Sottraggo l'ulteriore perdita
+        Pt7 = Pt6 * (Tt7_is / Tt7)^(gamma/(gamma-1));
+        T7 = Tt7 - V7^2/(2*cp);
+        M7 = V7 / sqrt(gamma * R * T7);
+        P7 = Pt7 / (1 + (gamma-1)/2 * M7^2)^(gamma/(gamma-1));
+        rho7_final = P7 / (R * T7);
+        V7 = m_dot / (rho7_final * A7);
+        eta_stage_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD - dH_t_2VLD - dH_vol_tot - dH_cone)/(L_eul + dH_tot_parassitic);
+       
+        L_is_new = cp*Tt1*((Pt7/Pt1)^((gamma-1)/gamma)-1);
+        eta_new = L_is_new/L;
+        eta_new = eta_c + relaxation_main * (eta_new - eta_c);
+        err_tot = abs(eta_new - eta_c)/eta_c;
+        err_tot_vect = [err_tot_vect; err_tot];
+        eta_c_vect = [eta_c_vect; eta_new];
+        m = m+1;
+        iter_tot = [iter_tot; m];
     end
-    eta_sens(i) = eta_tt_guess;
-    b2_sens(i) = b2_curr;
+    
+    % Store Results
+    Eta_results = [Eta_results, eta_stage_tt];
+    U2_results = [U2_results, U2];
+    D2_results = [D2_results, D2];
+    b2_results = [b2_results, b2];
+    
+    % --- CONTROLLO TESTUALE FINE ITERAZIONE ---
+    fprintf('   -> Completato. Eta=%.4f | U2=%.1f m/s (Iterazioni globali: %d)\n', eta_stage_tt, U2, m);
 end
 
-%% PLOT
-figure
-plot(D2_vec*1000, eta_sens, 'b-')
+%% Plotting
+figure('Name', 'Sensitivity Analysis')
+subplot(2,2,1)
+plot(Ds_vect, Eta_results*100, 'r-o', 'LineWidth', 1.5)
 grid on
-hold on
-xline(D2*1000, '--k', 'Balje Reference')
-[max_eta, idx] = max(eta_sens);
-plot(D2_vec(idx)*1000, max_eta, 'ro', 'MarkerFaceColor','r')
-xlabel('D2 [mm]')
-ylabel('\eta_{tt}')
-title('D2 sensitivity analysis')
-legend('Sensitivity','Reference','Optimum','Location','Best')
-
-figure
-plot(D2_vec*1000, b2_sens*1000, 'r-', 'LineWidth', 2)
+xlabel('Specific Diameter D_s')
+ylabel('Stage Efficiency [%]')
+title('Efficiency Optimization')
+subplot(2,2,2)
+plot(Ds_vect, U2_results, 'b-o', 'LineWidth', 1.5)
 grid on
-hold on
-plot(D2_vec(idx)*1000, b2_sens(idx)*1000, 'ko', 'MarkerFaceColor','k')
-xlabel('D2 [mm]')
-ylabel('b2 [mm]')
-title('Blade Height Constraint');
+yline(500, 'k--', 'Limit (Titanium)');
+xlabel('Specific Diameter D_s')
+ylabel('Tip Speed U_2 [m/s]')
+title('Mechanical Constraints')
+subplot(2,2,3)
+plot(Ds_vect, D2_results*1000, 'k-o', 'LineWidth', 1.5)
+grid on
+xlabel('Specific Diameter D_s')
+ylabel('Rotor Diameter D_2 [mm]')
+title('Geometry Variation')
+subplot(2,2,4)
+plot(Ds_vect, b2_results*1000, 'g-o', 'LineWidth', 1.5)
+grid on
+xlabel('Specific Diameter D_s')
+ylabel('Blade Height b_2 [mm]')
+title('Blade Height Variation')
+% Find Optimal
+[max_eta, idx] = max(Eta_results);
+fprintf('\n==========================================\n');
+fprintf('--- Sensitivity Analysis Results ---\n');
+fprintf('Optimal Ds: %.2f\n', Ds_vect(idx));
+fprintf('Max Efficiency: %.2f%%\n', max_eta*100);
+fprintf('Corresponding U2: %.1f m/s\n', U2_results(idx));
+fprintf('==========================================\n');

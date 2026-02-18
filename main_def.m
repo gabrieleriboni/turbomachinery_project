@@ -6,8 +6,8 @@
 %                        CENTRIFUGAL COMPRESSOR                           %
 %                          1: Impeller Inlet                              %
 %                          2: Impeller Outlet                             %
-%                          2-3: Vaneless Diffuser                           %
-%                          3-4: Vaned Diffuer                               %
+%                          2-3: Vaneless Diffuser                         %
+%                          3-4: Vaned Diffuer                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -46,7 +46,7 @@ omega = rpm * 2*pi/60;
 % assumiamo inlet con velocità bassa poi iter
 % per ora veramente gas perfetto
 % v1t =0 axial inlet
-alpha2 = 73;  % piccolo per evitare rircolo come da lezione
+alpha2 = 74;  % piccolo per evitare rircolo come da lezione
 alpha2 = alpha2 * pi/180;
 
 %% balje
@@ -60,7 +60,7 @@ omega_s = omega * sqrt(Q_in)/dht_is^(3/4);
 
 %%% output (Ds, psi)
 
-Ds = 4.5;  % first guess  % check su psi per shrouded/un
+Ds = 5.0;  % first guess  % check su psi per shrouded/un
 eta_c = 0.82; %first guess
 
 err_o = 1;
@@ -256,8 +256,18 @@ while abs(err_tot_vect(end))>1e-5
         %%% IMPELLER INTERNAL
         % skin friction (Jansen, 1967)
         visc_din1 = mu_NH3(T1); %sutherland
-        % D_h = 4*(2*pi*R2*b2/N_bl)/(2*b2+2*2*pi*R2/N_bl);
-        D_h = D2*cos(beta2) / (( N_bl/pi + D2*cos(beta2)/b2 ) + ( 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2) )/( N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2) ) );
+        
+        % Hydraulic diameter (Zhang et al. Eq 9)
+        % Note: Using D2, b2, beta2 (Outlet) and D1, beta1 (Inlet)
+        % s1 definition required for throat area calculation
+        s1 = (pi * D1_m / N_bl) * cos(beta1_mean);
+
+        term_out = N_bl/pi + D2*cos(beta2)/b2;
+        term_in_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+        term_in_den = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+        
+        D_h = D2*cos(beta2) / (term_out + term_in_num/term_in_den);
+
         Re_f = U2 * D_h/visc_din1*rho_t1;
         Cf = 0.0412 * Re_f ^(-0.1925);
         Lz = 0.08 + 3.16*phi; %computed as aungier
@@ -269,13 +279,6 @@ while abs(err_tot_vect(end))>1e-5
         % clearance (Jansen)
         eps = 5e-4;
         dH_cl = 0.6 * eps / b2 * V2_tg * ( 4*pi / (b2 * N_bl) * (R1_t_opt^2 - R1_h^2) / (R2 - R1_t_opt) *V2_tg * V1 / (1 + rho2 / rho1) )^(1/2);
-        % Aungier:
-        % m_dot_cl = ;
-        % D_avg = 0.5*(D2+ D1_m);
-        % b_avg = 0.5*(b1+b2);
-        % l_meridional = D2/2 - (D_e);
-        % dP_cl = m_dot*(D2*V2_tg)/(N_bl*D_avg*b_avg*l_meridional);
-        % dH_cl = m_dot_cl*dP_cl/(m_dot*rho1);
 
         % blade loading (Aungier, 1995) assumption of no inlet swirl (come da
         % china)
@@ -292,13 +295,14 @@ while abs(err_tot_vect(end))>1e-5
         end
         t_te = 2e-3; % imposto da geometria
         eps2 = 1- (N_bl * t_te)/(pi*D2);
-        A2 = pi*b2*D2*eps2;
-        W_out = sqrt((V2_meridional*A2/(pi*D2*b2))^2+W1_mean_t^2);
+        A2_annulus = pi*b2*D2;
+        A2_passages = A2_annulus * eps2;
+        W_out = sqrt((V2_meridional * (A2_passages/A2_annulus))^2 + W2_tg^2);
         dH_mix = 1/2 * (W_sep - W_out)^2;
 
         % entrance diffusion (Aungier)
         % pitch = pi*D1_m/N_bl - t;
-        A_th_geom = s * cos(beta1_geom_mean)*b1;
+        A_th_geom = s1 * b1;
         A_th = 0.97 * A_th_geom;
         W_th = m_dot/N_bl/rho1/A_th;
         dH_diff = 0.4*(W1_mean - W_th)^2;
@@ -387,7 +391,7 @@ while abs(err_tot_vect(end))>1e-5
 
     rho3 = rho2;  %first guess
     V3 = V2;      %first guess
-    k = 0.01;
+    k_vld = 0.01;
     errV3 = 1;
     errrho3 = 1;
     j = 0;
@@ -406,7 +410,7 @@ while abs(err_tot_vect(end))>1e-5
         V_avg = 0.5 * (V2 + V3);
         D_avg = 0.5 * (D2+D3);
         Re_avg = rho_avg * V_avg * D_avg/visc_din3;
-        Cf_vaneless = k*(1.8e5/Re_avg)^0.2;
+        Cf_vaneless = k_vld*(1.8e5/Re_avg)^0.2;
         b3 = tan(alpha3)/tan(alpha2) * b2*rho2/rho3;  %pinch
         V3_meridional = (V2_meridional*rho2*pi*D2*b2)/(rho3*pi*D3*b3);
         V3_tg = V3_meridional*tan(alpha3);
@@ -463,7 +467,7 @@ while abs(err_tot_vect(end))>1e-5
 
     %% 4. Vaned Diffuser (5 exit)
 
-    N_bl_VD = N_bl+2;
+    N_bl_VD = 29;
     while gcd(N_bl_VD, N_bl) ~= 1
         N_bl_VD = N_bl_VD - 1;
     end
@@ -472,11 +476,11 @@ while abs(err_tot_vect(end))>1e-5
     R5 = R2 * (1.55 + phi*4/pi);
     Ld = R5 - R2;
     AR_d = R5/R2;
-    R4 = 1.3*R3;
+    R4 = 1.33*R3;
     D4 = R4 *2;
     b4 = b3;
     t_bl_in = 0.001;
-    t_bl_out = 0.035;
+    t_bl_out = 0.015;
 
     alpha4_geom = asin( (R3/R4) * sin(alpha3_geom) ); %wedge
     alpha_mean_geom = 0.5 * (alpha3_geom + alpha4_geom);
@@ -492,93 +496,97 @@ while abs(err_tot_vect(end))>1e-5
     W4 = Pitch4 * cos(alpha4_geom) - t_bl_out;
     Lb = 2*(R4 - R3) / (cos(alpha3_geom)+cos(alpha4_geom));
     theta_c = atan((W4 - W3) / (2*Lb));
-    % W3 = 2*pi*R3*cos(alpha3_geom)/N_bl_VD;
-    % W4 = 2*pi*R4*cos(alpha4_geom)/N_bl_VD;
-    % theta_c = atan((W4 - W3)/ (2*Lb));
 
+    rho4 = rho3; % first guess
+    V4 = V3; % first guess
+    err_rho4 = 1;
+    it_vd = 0;
+    while err_rho4 > 1e-5 && it_vd < 50
+        rho4_old = rho4;
+        
+        V4_meridional = m_dot / (rho4_old * N_bl_VD * W4 * b4);
+        V4 = V4_meridional / cos(alpha4);
+        V4_tg = V4 * sin(alpha4);
+        
+        % losses
+        % incidence (Zhang et al. Eq 53-55)
+        A_inlet_VD = W3 * b3; 
+        cos_alpha_th = cos(alpha3)^2/cos(alpha3_geom); % Note: alpha3 is flow angle, but here used for throat ratio scaling
+        % Better implementation using geometric areas directly:
+        A_inlet_geom = 2 * pi * R3 * b3;
+        A_throat_geom = N_bl_VD * W3 * b3;
+        cos_alpha_th_geom = A_throat_geom / A_inlet_geom;
+        
+        cos_alpha_opt = sqrt(cos(alpha3_geom) * cos_alpha_th_geom);
+        V3_opt = V3_meridional / cos_alpha_opt;
+        
+        dH_inc_VD = 0.4 * (V3 - V3_opt)^2;
 
-    % alpha4_geom = alpha3_geom;
-    % alpha_mean_geom = 0.5 * (alpha3_geom + alpha4_geom);
-    % camber = 0;
-    % sigma = N_bl_VD * (R4-R3)/(2*pi*R3*cos(alpha_mean_geom));
-    % theta = alpha4_geom - alpha3_geom;
-    % delta_s = 0;
-    % d_delta_i = exp(((1.5-(90-alpha3_geom)/60)^2-3.3)*sigma);
-    % alpha4 = alpha4_geom - delta_s - d_delta_i * (alpha3_geom - alpha3);
-    % W3 = 2*pi*R3*cos(alpha3_geom)/N_bl_VD;
-    % W4 = 2*pi*R4*cos(alpha4_geom)/N_bl_VD;
-    % Lb = (R4 - R3) / (cos(alpha4));
-    % theta_c = atan((W4 - W3) / (2*Lb));
-    AR_VD = R4*cos(alpha4_geom)/R3/cos(alpha3_geom);
-    V4_meridional = m_dot / (rho3 * pi * D4 * b4); % Prima stima usando rho3
-    V4 = V4_meridional / cos(alpha4);              % Velocità assoluta imposta dall'angolo
-    V4_tg = V4 * sin(alpha4);
-    dv = 2*pi*(R3*V3_tg-R4*V4_tg)/(N_bl_VD*Lb);
-    L_check = dv/(V3-V4);
-    t_bl_VD = t_bl_out;
+        % friction
+        Dh_in = 2 * (W3 * b3) / (W3 + b3);
+        Dh_out = 2 * (W4 * b4) / (W4 + b4);
+        Dh_avg_VD = 0.5 * (Dh_in + Dh_out);
+        Cf_vaned = k_vld*(1.8e5/Re_avg)^0.2;
+        dH_fr_VD = Cf_vaned * Lb/Dh_avg_VD*((V3+V4)/2)^2;
 
-    % losses
+        % choke losses (Zhang et al. Eq 57-59)
+        A_th_VD_geom = N_bl_VD * W3 * b3; % Geometric Throat Area
+        A_inlet_VD_geom = 2 * pi * R3 * b3; % Inlet Annulus Area
+        
+        % Cr_rvd (Eq. 59): Ratio of projected inlet area to throat area
+        % Note: Using alpha3_geom (Blade Angle) as per paper's alpha_4b
+        Cr_VD = sqrt( (A_inlet_VD_geom * cos(alpha3_geom)) / A_th_VD_geom );
+        
+        % Critical Area for Sonic Flow (A*)
+        M3_abs = V3/sqrt(gamma*R*T3);
+        A_th_star = M3_abs * A_th_VD_geom / ( (2/(gamma+1))*(1+(gamma-1)/2*M3_abs^2) )^((gamma+1)/(2*(gamma-1)));
+        
+        % Choke Parameter X (Eq. 58)
+        X_VD = 11 - 10 * (Cr_VD * A_th_VD_geom) / A_th_star;
+        
+        if X_VD <= 0
+            dH_choke_VD = 0;
+        else
+            dH_choke_VD = 1/2 * V3^2 * (0.05 * X_VD + X_VD^7);
+        end
 
-    % incidence
-    alpha_th = cos(alpha3)^2/cos(alpha3_geom);
-    V3_opt = V3_meridional/sqrt(cos(alpha3_geom)*cos(alpha_th));
-    dH_inc_VD = 0.4*(V3 - V3_opt)^2;
+        % blockage
+        Cl = 1;
+        C_theta = 1;
+        k1 = 0.2*(1-1/Cl/C_theta);
+        k2 = 2*theta_c/125/C_theta*(1-2*theta_c/22*C_theta);
+        Cr = 1/2*V3_meridional*cos(alpha4_geom)/(V4_meridional*cos(alpha3_geom))+1;
+        B4 = (k1+k2*(Cr^2-1))*Lb/W4;
+        dH_bl_VD = 1/2*(V4/(1-B4)-V4)^2;
 
-    % friction
-    Dh_in = 2 * (W3 * b3) / (W3 + b3);
-    Dh_out = 2 * (W4 * b4) / (W4 + b4);
-    Dh_avg_VD = 0.5 * (Dh_in + Dh_out);
-    Cf_vaned = k*(1.8e5/Re_avg)^0.2;
-    dH_fr_VD = Cf_vaned * Lb/Dh_avg_VD*((V3+V4)/2)^2;
+        % mix
+        V_sep = V4/(1+2*C_theta);
+        %(V4_meridional*A4_pass/(pi*D4*b4))^2
+        %A4_pass = 2*pi*R4*b4/N_bl_VD - t_bl_VD
+        V4_meridional_mixed = m_dot / (rho4 * 2 * pi * R4 * b4);
+        V_out = sqrt(V4_meridional_mixed^2 + V4_tg^2);
+        dH_mix_VD = 0.5 * (V_sep - V_out)^2;
 
-    % choke losses
-    A_th_VD = A3 * cos(alpha_th);
-    M3_abs = V3/sqrt(gamma*R*T3);
-    A_th_star = M3_abs*(A3/N_bl_VD)*cos(alpha3_geom)/(1+(gamma-1)*M3_abs^2/2)^((gamma+1)/(2*(gamma-1)))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
-    Cr_VD = sqrt((A3/N_bl_VD)*cos(alpha3_geom)/A_th_VD);
-    X_VD = 11 - 10*(Cr_VD*A_th_VD)/A_th_star;
-    if X_VD<=0
-        dH_choke_VD = 0;
-    else
-        dH_choke_VD = 1/2*V3^2*(0.05*X_VD+X_VD^7);
+        dH_t_VD = dH_inc_VD + dH_fr_VD + dH_choke_VD + dH_bl_VD + dH_mix_VD;
+
+        eta_int_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD)/(L_eul + dH_tot_parassitic);
+
+        Tt4 = Tt2; 
+        T4 = Tt4 - V4^2 / (2*cp); 
+        Pt4 = Pt1 * (1 + eta_int_tt * ((Tt2 - Tt1)/Tt1))^(gamma/(gamma-1));
+        M4 = V4/sqrt(gamma*R*T4);
+        P4 = Pt4 / (1 + (gamma-1)/2 * M4^2)^(gamma/(gamma-1));
+        rho4 = P4 / (R*T4);
+        
+        err_rho4 = abs(rho4 - rho4_old)/rho4_old;
+        it_vd = it_vd + 1;
     end
 
-    % blockage
-    Cl = 1;
-    C_theta = 1;
-    k1 = 0.2*(1-1/Cl/C_theta);
-    k2 = 2*theta_c/125/C_theta*(1-2*theta_c/22*C_theta);
-    Cr = 1/2*V3_meridional*cos(alpha4_geom)/(V4_meridional*cos(alpha3_geom))+1;
-    B4 = (k1+k2*(Cr^2-1))*Lb/W4;
-    dH_bl_VD = 1/2*(V4/(1-B4)-V4)^2;
-
-    % mix
-    V_sep = V4/(1+2*C_theta);
-    A4_pass = 2*pi*R4*b4/N_bl_VD - t_bl_VD;
-    V_out = sqrt((V4_meridional*A4_pass/pi/D4/b4)^2+V4_tg);
-    dH_mix_VD = 0.5 * (V_sep - V_out)^2;
-
-    dH_t_VD = dH_inc_VD + dH_fr_VD + dH_choke_VD + dH_bl_VD + dH_mix_VD;
-
-    eta_int_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD)/(L_eul + dH_tot_parassitic);
-
-    Tt4 = Tt2;  % T_total costante attraverso il diffusore
-    T4 = Tt4 - V4^2 / (2*cp); % Ora T4 sarà positiva e corretta
-
-% Ricalcolo Pt4 usando la tua efficienza
-Pt4 = Pt1 * (1 + eta_int_tt * ((Tt2 - Tt1)/Tt1))^(gamma/(gamma-1));
-
-M4 = V4/sqrt(gamma*R*T4);
-P4 = Pt4 / (1 + (gamma-1)/2 * M4^2)^(gamma/(gamma-1));
-rho4 = P4 / (R*T4);
-
-% AGGIORNAMENTO VELOCITA':
-% Ora che abbiamo rho4 corretto (diverso da rho3), aggiorniamo la velocità per il while successivo
-V4_meridional = m_dot / (rho4 * pi * D4 * b4);
-V4 = V4_meridional / cos(alpha4);
-
-pitch_4 = 2 * pi * R4 / N_bl_VD;
-S4 = b4 * (pitch_4 * cos(alpha4));
+    dv = 2*pi*(R3*V3_tg-R4*V4_tg)/(N_bl_VD*Lb);
+    L_check = dv/(V3-V4);
+    AR_VD = W4/W3;
+    pitch_4 = 2 * pi * R4 / N_bl_VD;
+    S4 = b4 * (pitch_4 * cos(alpha4));
     %% altro vaneless
     
     D5 = R5*2;
@@ -633,20 +641,82 @@ S4 = b4 * (pitch_4 * cos(alpha4));
         iter_rho5 = [iter_rho5; jj];
     end
 
+     C_p = (P5-P3)/(Pt3-P3);
     %% Volute
 
-    SP = 1;
-    
-    R6 = R5 * 1.1;
-    rho6 = 
+    SP = 1.1;
+    K_friction = 0.005;
+    r6 = R5 * 1.1;
+    rho6 = rho5;
+    err_vol = 1;
+    iter_vol = 0;
+    while err_vol > 1e-4 && iter_vol < 100
 
-    eta_stage_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD - dH_t_2VLD)/(L_eul + dH_tot_parassitic);
+        V6 = (R5 * V5_tg) / (r6 * SP);
+        Tt6 = Tt5;
+        T6 = Tt6 - V6^2 / (2*cp);
+        A6 = m_dot / (rho6 * V6);
+        r_sect = sqrt(A6 / pi);
+        D_throat = 2 * r_sect;
+        r6_new = R5 + r_sect;
+        P_dyn_5 = Pt5 - P5;
 
+        % losses
+
+        % Meridional Loss
+        dH_vol_merid = 0.5 * V5_meridional^2;
+
+        % Tangential Velocity Loss
+        term_sp = 0;
+        if SP >= 1
+            term_sp = (1 - 1/SP^2);
+            dH_vol_tan = 0.5 * (R5/r6) * V5_tg^2 * term_sp * 0.5; % Il fattore 0.5 viene dalla formula (2.107)
+        else
+            term_sp = (1 - 1/SP)^2;
+            dH_vol_tan = (R5/r6) * V5_tg^2 * term_sp * 0.5; % Qui non c'è il fattore 0.5 iniziale nella formula (2.107)
+        end
+
+        % Skin Friction Loss
+        L_vol = pi * (R5 + r6_new); % Lunghezza media voluta
+        d_H = D_throat;             % Diametro idraulico
+        dH_vol_fric = 2 * K_friction * (L_vol / d_H) * V6^2;
+
+        % Somma Perdite Voluta
+        dH_vol_tot = dH_vol_merid + dH_vol_tan + dH_vol_fric;
+
+        Tt6_is = Tt6 - dH_vol_tot / cp;
+        Pt6 = Pt5 * (Tt6_is / Tt5)^(gamma/(gamma-1));
+        M6 = V6 / sqrt(gamma * R * T6);
+        P6 = Pt6 / (1 + (gamma-1)/2 * M6^2)^(gamma/(gamma-1));
+        rho6_new = P6 / (R * T6);
+        err_vol = abs(r6_new - r6)/r6 + abs(rho6_new - rho6)/rho6;
+        r6 = r6_new;
+        rho6 = rho6_new;
+        iter_vol = iter_vol + 1;
+    end
+
+    %% 7. exit cone
+
+    AR_cone = 2.3;       % Area Ratio diffusore uscita
+    A7 = A6 * AR_cone;
+    D_exit = sqrt(4 * A7 / pi);
+    rho7 = rho6; 
+    V7 = m_dot / (rho7 * A7);
+    dH_cone = 0.5 * (V6 - V7)^2;
+    Tt7 = Tt6; % Adiabatico
+    Tt7_is = Tt7 - dH_cone / cp; % Sottraggo l'ulteriore perdita
+    Pt7 = Pt6 * (Tt7_is / Tt7)^(gamma/(gamma-1));
+    T7 = Tt7 - V7^2/(2*cp);
+    M7 = V7 / sqrt(gamma * R * T7);
+    P7 = Pt7 / (1 + (gamma-1)/2 * M7^2)^(gamma/(gamma-1));
+    rho7_final = P7 / (R * T7);
+    V7 = m_dot / (rho7_final * A7);
+
+
+    eta_stage_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD - dH_t_2VLD - dH_vol_tot - dH_cone)/(L_eul + dH_tot_parassitic);
    
-    C_p = (P5-P3)/(Pt3-P3);
 
-    L_is_new = cp*Tt1*((Pt5/Pt1)^((gamma-1)/gamma)-1);
-
+    L_is_new = cp*Tt1*((Pt7/Pt1)^((gamma-1)/gamma)-1);
     eta_new = L_is_new/L;
     eta_new = eta_c + relaxation_main * (eta_new - eta_c);
     err_tot = abs(eta_new - eta_c)/eta_c;
@@ -664,9 +734,9 @@ end
 figure
 semilogy(iter_tot, err_tot_vect, '.-')
 grid on
-title('err_eta_c')
+title('err\_eta\_c')
 xlabel('iter')
-ylabel('log(err_{eta_c)')
+ylabel('log(err_{eta\_c})')
 figure
 plot(iter_tot, eta_c_vect, '.-')
 grid on
@@ -679,7 +749,7 @@ ylabel('\eta_c')
 m_dot1 = rho * V1 * pi * (R1_t_opt^2 - R1_h^2); % V1_meridional = V1
 m_dot2 = rho2 * V2_meridional * D2 * b2 * pi;
 m_dot3 = rho3 * V3_meridional*D3*b3*pi;
-m_dot4 = rho4*V4*S4*N_bl_VD;
+m_dot4 = rho4 * V4_meridional * N_bl_VD * W4 * b4;
 
 check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'tau', tau, '<1 backwards';

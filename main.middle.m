@@ -6,8 +6,8 @@
 %                        CENTRIFUGAL COMPRESSOR                           %
 %                          1: Impeller Inlet                              %
 %                          2: Impeller Outlet                             %
-%                          2-3: Vaneless Diffuser                         %
-%                          3-4: Vaned Diffuer                             %
+%                          2-3: Vaneless Diffuser                           %
+%                          3-4: Vaned Diffuer                               %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -46,7 +46,7 @@ omega = rpm * 2*pi/60;
 % assumiamo inlet con velocità bassa poi iter
 % per ora veramente gas perfetto
 % v1t =0 axial inlet
-alpha2 = 74;  % piccolo per evitare rircolo come da lezione
+alpha2 = 73;  % piccolo per evitare rircolo come da lezione
 alpha2 = alpha2 * pi/180;
 
 %% balje
@@ -60,7 +60,7 @@ omega_s = omega * sqrt(Q_in)/dht_is^(3/4);
 
 %%% output (Ds, psi)
 
-Ds = 5.0;  % first guess  % check su psi per shrouded/un
+Ds = 4.5;  % first guess  % check su psi per shrouded/un
 eta_c = 0.82; %first guess
 
 err_o = 1;
@@ -463,7 +463,7 @@ while abs(err_tot_vect(end))>1e-5
 
     %% 4. Vaned Diffuser (5 exit)
 
-    N_bl_VD = 29;
+    N_bl_VD = 28;
     while gcd(N_bl_VD, N_bl) ~= 1
         N_bl_VD = N_bl_VD - 1;
     end
@@ -472,11 +472,11 @@ while abs(err_tot_vect(end))>1e-5
     R5 = R2 * (1.55 + phi*4/pi);
     Ld = R5 - R2;
     AR_d = R5/R2;
-    R4 = 1.33*R3;
+    R4 = 1.3*R3;
     D4 = R4 *2;
     b4 = b3;
     t_bl_in = 0.001;
-    t_bl_out = 0.015;
+    t_bl_out = 0.035;
 
     alpha4_geom = asin( (R3/R4) * sin(alpha3_geom) ); %wedge
     alpha_mean_geom = 0.5 * (alpha3_geom + alpha4_geom);
@@ -510,7 +510,7 @@ while abs(err_tot_vect(end))>1e-5
     % Lb = (R4 - R3) / (cos(alpha4));
     % theta_c = atan((W4 - W3) / (2*Lb));
     AR_VD = W4/W3;
-    V4_meridional = m_dot / (rho3 * N_bl_VD * W4 * b4); % Prima stima usando rho3
+    V4_meridional = m_dot / (rho3 * pi * W4 * N_bl_VD* b4); % Prima stima usando rho3
     V4 = V4_meridional / cos(alpha4);              % Velocità assoluta imposta dall'angolo
     V4_tg = V4 * sin(alpha4);
     dv = 2*pi*(R3*V3_tg-R4*V4_tg)/(N_bl_VD*Lb);
@@ -574,7 +574,7 @@ rho4 = P4 / (R*T4);
 
 % AGGIORNAMENTO VELOCITA':
 % Ora che abbiamo rho4 corretto (diverso da rho3), aggiorniamo la velocità per il while successivo
-V4_meridional = m_dot / (rho4 * N_bl_VD * W4 * b4);
+V4_meridional = m_dot / (rho4 * pi * W4 * N_bl_VD* b4);
 V4 = V4_meridional / cos(alpha4);
 
 pitch_4 = 2 * pi * R4 / N_bl_VD;
@@ -749,7 +749,7 @@ check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'nu', nu, '[0.3-0.7]';
     'mer_grad', mer_grad, '[0.5-0.7]';
     'M1_tip_rel',M1_tip_rel,'<1.3';
-    'DR',DR, '[]';
+    'DR',DR, '[>1]';
     'M2',M2, '[<1.3]';
     'chi',chi, '[0.5-0.6] unshrouded ([0.6-0.7] shrouded)';
     'beta2', beta2_geom_deg, '[-20 -30] unshrouded ([-40 -50] shrouded)';
