@@ -6,8 +6,8 @@
 %                        CENTRIFUGAL COMPRESSOR                           %
 %                          1: Impeller Inlet                              %
 %                          2: Impeller Outlet                             %
-%                          2-3: Vaneless Diffuser                           %
-%                          3-4: Vaned Diffuer                               %
+%                          2-3: Vaneless Diffuser                         %
+%                          3-4: Vaned Diffuer                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -46,7 +46,7 @@ omega = rpm * 2*pi/60;
 % assumiamo inlet con velocità bassa poi iter
 % per ora veramente gas perfetto
 % v1t =0 axial inlet
-alpha2 = 73;  % piccolo per evitare rircolo come da lezione
+alpha2 = 74;  % piccolo per evitare rircolo come da lezione
 alpha2 = alpha2 * pi/180;
 
 %% balje
@@ -60,7 +60,7 @@ omega_s = omega * sqrt(Q_in)/dht_is^(3/4);
 
 %%% output (Ds, psi)
 
-Ds = 4.5;  % first guess  % check su psi per shrouded/un
+Ds = 5.0;  % first guess  % check su psi per shrouded/un
 eta_c = 0.82; %first guess
 
 err_o = 1;
@@ -463,7 +463,7 @@ while abs(err_tot_vect(end))>1e-5
 
     %% 4. Vaned Diffuser (5 exit)
 
-    N_bl_VD = N_bl+2;
+    N_bl_VD = 29;
     while gcd(N_bl_VD, N_bl) ~= 1
         N_bl_VD = N_bl_VD - 1;
     end
@@ -472,11 +472,11 @@ while abs(err_tot_vect(end))>1e-5
     R5 = R2 * (1.55 + phi*4/pi);
     Ld = R5 - R2;
     AR_d = R5/R2;
-    R4 = 1.3*R3;
+    R4 = 1.33*R3;
     D4 = R4 *2;
     b4 = b3;
     t_bl_in = 0.001;
-    t_bl_out = 0.035;
+    t_bl_out = 0.015;
 
     alpha4_geom = asin( (R3/R4) * sin(alpha3_geom) ); %wedge
     alpha_mean_geom = 0.5 * (alpha3_geom + alpha4_geom);
@@ -509,8 +509,8 @@ while abs(err_tot_vect(end))>1e-5
     % W4 = 2*pi*R4*cos(alpha4_geom)/N_bl_VD;
     % Lb = (R4 - R3) / (cos(alpha4));
     % theta_c = atan((W4 - W3) / (2*Lb));
-    AR_VD = R4*cos(alpha4_geom)/R3/cos(alpha3_geom);
-    V4_meridional = m_dot / (rho3 * pi * D4 * b4); % Prima stima usando rho3
+    AR_VD = W4/W3;
+    V4_meridional = m_dot / (rho3 * N_bl_VD * W4 * b4); % Prima stima usando rho3
     V4 = V4_meridional / cos(alpha4);              % Velocità assoluta imposta dall'angolo
     V4_tg = V4 * sin(alpha4);
     dv = 2*pi*(R3*V3_tg-R4*V4_tg)/(N_bl_VD*Lb);
@@ -574,7 +574,7 @@ rho4 = P4 / (R*T4);
 
 % AGGIORNAMENTO VELOCITA':
 % Ora che abbiamo rho4 corretto (diverso da rho3), aggiorniamo la velocità per il while successivo
-V4_meridional = m_dot / (rho4 * pi * D4 * b4);
+V4_meridional = m_dot / (rho4 * N_bl_VD * W4 * b4);
 V4 = V4_meridional / cos(alpha4);
 
 pitch_4 = 2 * pi * R4 / N_bl_VD;
@@ -633,13 +633,82 @@ S4 = b4 * (pitch_4 * cos(alpha4));
         iter_rho5 = [iter_rho5; jj];
     end
 
-    eta_stage_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD - dH_t_2VLD)/(L_eul + dH_tot_parassitic);
+     C_p = (P5-P3)/(Pt3-P3);
+    %% Volute
 
+    SP = 1.1;
+    K_friction = 0.005;
+    r6 = R5 * 1.1;
+    rho6 = rho5;
+    err_vol = 1;
+    iter_vol = 0;
+    while err_vol > 1e-4 && iter_vol < 100
+
+        V6 = (R5 * V5_tg) / (r6 * SP);
+        Tt6 = Tt5;
+        T6 = Tt6 - V6^2 / (2*cp);
+        A6 = m_dot / (rho6 * V6);
+        r_sect = sqrt(A6 / pi);
+        D_throat = 2 * r_sect;
+        r6_new = R5 + r_sect;
+        P_dyn_5 = Pt5 - P5;
+
+        % losses
+
+        % Meridional Loss
+        dH_vol_merid = 0.5 * V5_meridional^2;
+
+        % Tangential Velocity Loss
+        term_sp = 0;
+        if SP >= 1
+            term_sp = (1 - 1/SP^2);
+            dH_vol_tan = 0.5 * (R5/r6) * V5_tg^2 * term_sp * 0.5; % Il fattore 0.5 viene dalla formula (2.107)
+        else
+            term_sp = (1 - 1/SP)^2;
+            dH_vol_tan = (R5/r6) * V5_tg^2 * term_sp * 0.5; % Qui non c'è il fattore 0.5 iniziale nella formula (2.107)
+        end
+
+        % Skin Friction Loss
+        L_vol = pi * (R5 + r6_new); % Lunghezza media voluta
+        d_H = D_throat;             % Diametro idraulico
+        dH_vol_fric = 2 * K_friction * (L_vol / d_H) * V6^2;
+
+        % Somma Perdite Voluta
+        dH_vol_tot = dH_vol_merid + dH_vol_tan + dH_vol_fric;
+
+        Tt6_is = Tt6 - dH_vol_tot / cp;
+        Pt6 = Pt5 * (Tt6_is / Tt5)^(gamma/(gamma-1));
+        M6 = V6 / sqrt(gamma * R * T6);
+        P6 = Pt6 / (1 + (gamma-1)/2 * M6^2)^(gamma/(gamma-1));
+        rho6_new = P6 / (R * T6);
+        err_vol = abs(r6_new - r6)/r6 + abs(rho6_new - rho6)/rho6;
+        r6 = r6_new;
+        rho6 = rho6_new;
+        iter_vol = iter_vol + 1;
+    end
+
+    %% 7. exit cone
+
+    AR_cone = 2.3;       % Area Ratio diffusore uscita
+    A7 = A6 * AR_cone;
+    D_exit = sqrt(4 * A7 / pi);
+    rho7 = rho6; 
+    V7 = m_dot / (rho7 * A7);
+    dH_cone = 0.5 * (V6 - V7)^2;
+    Tt7 = Tt6; % Adiabatico
+    Tt7_is = Tt7 - dH_cone / cp; % Sottraggo l'ulteriore perdita
+    Pt7 = Pt6 * (Tt7_is / Tt7)^(gamma/(gamma-1));
+    T7 = Tt7 - V7^2/(2*cp);
+    M7 = V7 / sqrt(gamma * R * T7);
+    P7 = Pt7 / (1 + (gamma-1)/2 * M7^2)^(gamma/(gamma-1));
+    rho7_final = P7 / (R * T7);
+    V7 = m_dot / (rho7_final * A7);
+
+
+    eta_stage_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD - dH_t_2VLD - dH_vol_tot - dH_cone)/(L_eul + dH_tot_parassitic);
    
-    C_p = (P5-P3)/(Pt3-P3);
 
-    L_is_new = cp*Tt1*((Pt5/Pt1)^((gamma-1)/gamma)-1);
-
+    L_is_new = cp*Tt1*((Pt7/Pt1)^((gamma-1)/gamma)-1);
     eta_new = L_is_new/L;
     eta_new = eta_c + relaxation_main * (eta_new - eta_c);
     err_tot = abs(eta_new - eta_c)/eta_c;

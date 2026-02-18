@@ -463,21 +463,20 @@ while abs(err_tot_vect(end))>1e-5
 
     %% 4. Vaned Diffuser (5 exit)
 
-    N_bl_VD = N_bl - 1;
+    N_bl_VD = N_bl+2;
     while gcd(N_bl_VD, N_bl) ~= 1
         N_bl_VD = N_bl_VD - 1;
     end
-    alpha3_geom = alpha3 - 2.5*pi/180;
-  
-    R5 = R2 *(1.55 + phi*4/pi);
+    alpha3_geom = alpha3 - 0.5*pi/180;
+    A3 = 2*pi*R3*b3;
+    R5 = R2 * (1.55 + phi*4/pi);
     Ld = R5 - R2;
     AR_d = R5/R2;
-    R4 = 1.55*R3;
+    R4 = 1.3*R3;
     D4 = R4 *2;
     b4 = b3;
     t_bl_in = 0.001;
-    t_bl_out = 0.030;
-    A3 = 2*pi*R3*b3 - t_bl_in*N_bl_VD;
+    t_bl_out = 0.035;
 
     alpha4_geom = asin( (R3/R4) * sin(alpha3_geom) ); %wedge
     alpha_mean_geom = 0.5 * (alpha3_geom + alpha4_geom);
@@ -511,7 +510,7 @@ while abs(err_tot_vect(end))>1e-5
     % Lb = (R4 - R3) / (cos(alpha4));
     % theta_c = atan((W4 - W3) / (2*Lb));
     AR_VD = R4*cos(alpha4_geom)/R3/cos(alpha3_geom);
-    V4_meridional = m_dot / (rho3 * (pi * D4 * b4 - t_bl_out*N_bl_VD)); % Prima stima usando rho3
+    V4_meridional = m_dot / (rho3 * pi * D4 * b4); % Prima stima usando rho3
     V4 = V4_meridional / cos(alpha4);              % Velocità assoluta imposta dall'angolo
     V4_tg = V4 * sin(alpha4);
     dv = 2*pi*(R3*V3_tg-R4*V4_tg)/(N_bl_VD*Lb);
@@ -575,12 +574,11 @@ rho4 = P4 / (R*T4);
 
 % AGGIORNAMENTO VELOCITA':
 % Ora che abbiamo rho4 corretto (diverso da rho3), aggiorniamo la velocità per il while successivo
-V4_meridional = m_dot / (rho4 * (pi * D4 * b4 - t_bl_out*N_bl_VD));
+V4_meridional = m_dot / (rho4 * pi * D4 * b4);
 V4 = V4_meridional / cos(alpha4);
 
-pitch_4 = 2 * pi * R4 / N_bl_VD - t_bl_VD;
-S4 = b4 * (pitch_4 * cos(alpha4) - t_bl_VD);
-AR_VD_diff = (R4 * cos(alpha4_geom))/(R3*cos(alpha3_geom));
+pitch_4 = 2 * pi * R4 / N_bl_VD;
+S4 = b4 * (pitch_4 * cos(alpha4));
     %% altro vaneless
     
     D5 = R5*2;
@@ -635,6 +633,13 @@ AR_VD_diff = (R4 * cos(alpha4_geom))/(R3*cos(alpha3_geom));
         iter_rho5 = [iter_rho5; jj];
     end
 
+    %% Volute
+
+    SP = 1;
+    
+    R6 = R5 * 1.1;
+    rho6 = 
+
     eta_stage_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD - dH_t_2VLD)/(L_eul + dH_tot_parassitic);
 
    
@@ -687,7 +692,6 @@ check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'chi',chi, '[0.5-0.6] unshrouded ([0.6-0.7] shrouded)';
     'beta2', beta2_geom_deg, '[-20 -30] unshrouded ([-40 -50] shrouded)';
     'AR', AR, '[0.03-0.15]';
-    'AR_diff_VD', AR_VD_diff, '';
     'blade height (nu)', nu, '[0.3-0.7]';
     'alpha2', rad2deg(alpha2), '[<80 avoiding recirculation]';
     'mer_grad', mer_grad, '[0.5-0.7]';
