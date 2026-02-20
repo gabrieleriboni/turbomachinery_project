@@ -527,7 +527,12 @@ while abs(err_tot_vect(end))>1e-5
         Dh_in = 2 * (W3 * b3) / (W3 + b3);
         Dh_out = 2 * (W4 * b4) / (W4 + b4);
         Dh_avg_VD = 0.5 * (Dh_in + Dh_out);
-        Cf_vaned = k_vld*(1.8e5/Re_avg)^0.2;
+        
+        rho_avg_VD = 0.5 * (rho3 + rho4);
+        V_avg_VD = 0.5 * (V3 + V4);
+        Re_VD = rho_avg_VD * V_avg_VD * Dh_avg_VD / visc_din3;
+        Cf_vaned = k_vld*(1.8e5/Re_VD)^0.2;
+        
         dH_fr_VD = Cf_vaned * Lb/Dh_avg_VD*((V3+V4)/2)^2;
 
         % choke losses (Zhang et al. Eq 57-59)

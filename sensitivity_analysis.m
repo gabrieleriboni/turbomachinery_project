@@ -175,22 +175,24 @@ for Ds = Ds_vect
             W2_tg_inf = V2_tg_inf - U2;
             beta2_geom = atan(W2_tg_inf/W2_meridional);
             beta2_geom_deg = beta2_geom *180/pi; 
-            beta1_geom_tip = atan(1-t*N_bl/(2*pi*R1_t_opt)*tan(beta1_tip));
-            beta1_geom_mean = atan(1-t*N_bl/(2*pi*R1_m)*tan(beta1_mean));
-            beta1_geom_hub = atan(1-t*N_bl/(2*pi*R1_h)*tan(beta1_hub));
+            beta1_geom_tip = atan((1-t*N_bl/(2*pi*R1_t_opt))*tan(beta1_tip));
+            beta1_geom_mean = atan((1-t*N_bl/(2*pi*R1_m))*tan(beta1_mean));
+            beta1_geom_hub = atan((1-t*N_bl/(2*pi*R1_h))*tan(beta1_hub));
             %% rotor losses
-            % incidence=0 per costruzione ma non off-design
-            dH_inc = 0.4*(W1_mean - V1/cos(beta1_mean))^2;
+            % incidence loss relative to metal angle
+            dH_inc = 0.4*(W1_mean - V1/cos(beta1_geom_mean))^2;
             %%% IMPELLER INTERNAL
             % skin friction (Jansen, 1967)
-            visc_din1 = mu_NH3(T1); 
-            
+            visc_din1 = mu_NH3(T1);
+
             % Hydraulic diameter (Zhang et al. Eq 9)
-            s1 = (pi * D1_m / N_bl) * cos(beta1_mean);
-            term_out = N_bl/pi + D2*cos(beta2)/b2;
-            term_in_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
-            term_in_den = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
-            D_h = D2*cos(beta2) / (term_out + term_in_num/term_in_den);
+            s1 = (pi * D1_m / N_bl) * cos(beta1_geom_mean);
+
+            term_den1 = N_bl/pi + D2*cos(beta2)/b2;
+            term_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+            term_den2 = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+
+            D_h = D2*cos(beta2) / (term_den1) + term_num/term_den2;
             Re_f = U2 * D_h/visc_din1*rho_t1;
             Cf = 0.0412 * Re_f ^(-0.1925);
             Lz = 0.08 + 3.16*phi; 
@@ -213,8 +215,9 @@ for Ds = Ds_vect
             end
             t_te = 2e-3; 
             eps2 = 1- (N_bl * t_te)/(pi*D2);
-            A2 = pi*b2*D2*eps2;
-            W_out = sqrt((V2_meridional*A2/(pi*D2*b2))^2+W2_tg^2); % Corrected mixing logic
+            A2_annulus = pi*b2*D2;
+            A2_passages = A2_annulus * eps2;
+            W_out = sqrt((V2_meridional * (A2_passages/A2_annulus))^2 + W2_tg^2);
             dH_mix = 1/2 * (W_sep - W_out)^2;
             % entrance diffusion (Aungier)
             A_th_geom = s1 * b1; % Corrected s1 logic
@@ -372,7 +375,12 @@ for Ds = Ds_vect
             Dh_in = 2 * (W3 * b3) / (W3 + b3);
             Dh_out = 2 * (W4 * b4) / (W4 + b4);
             Dh_avg_VD = 0.5 * (Dh_in + Dh_out);
-            Cf_vaned = k_vld*(1.8e5/Re_avg)^0.2;
+            
+            rho_avg_VD = 0.5 * (rho3 + rho4);
+            V_avg_VD = 0.5 * (V3 + V4);
+            Re_VD = rho_avg_VD * V_avg_VD * Dh_avg_VD / visc_din3;
+            Cf_vaned = k_vld*(1.8e5/Re_VD)^0.2;
+            
             dH_fr_VD = Cf_vaned * Lb/Dh_avg_VD*((V3+V4)/2)^2;
             % choke losses (Zhang et al. Eq 57-59)
             A_th_VD_geom = N_bl_VD * W3 * b3; % Geometric Throat Area

@@ -1,4 +1,4 @@
-%% script_curve.m
+%% script_map.m
 clear
 close all
 clc
@@ -24,124 +24,149 @@ T_0_NH3  = 293.15;
 S_NH3    = 370;
 mu_NH3 = @(T) mu_0_NH3 * (T./T_0_NH3).^(1.5) .* (T_0_NH3 + S_NH3) ./ (T + S_NH3);
 
-%% Operating condition (fixed speed + inlet totals)
+%% Operating condition (design)
 Pt1   = geom.Pt1;
 Tt1   = geom.Tt1;
-omega = geom.omega;
-
-%% Mass-flow sweep (include design point exactly)
+omega_des = geom.omega;
 m_dot_des = geom.m_dot_design;
-m_dot_vec = sort(unique([linspace(0.6*m_dot_des,1.4*m_dot_des,81), m_dot_des]));
 
-% Preallocate
-beta_tt_vec   = nan(size(m_dot_vec));
-eta_c_vec     = nan(size(m_dot_vec));
-eta_stage_vec = nan(size(m_dot_vec));
-X_imp_vec     = nan(size(m_dot_vec));
-X_vd_vec      = nan(size(m_dot_vec));
-choked_vec    = false(size(m_dot_vec));
-converged_vec = false(size(m_dot_vec));
+%% Speed and Mass-flow sweep
+% Define different rotational speeds relative to design speed
+speed_ratios = [0.4, 0.6, 0.8, 1.0, 1.1, 1.2, 1.4];
 
-fprintf('OFF-DESIGN sweep started...\n');
-
-for ii = 1:numel(m_dot_vec)
-    m_dot = m_dot_vec(ii);
-
-    res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, mu_NH3);
-
-    beta_tt_vec(ii)   = res.beta_tt;
-    eta_c_vec(ii)     = res.eta_c;
-    eta_stage_vec(ii) = res.eta_stage_tt;
-
-    X_imp_vec(ii) = res.X_imp;
-    X_vd_vec(ii)  = res.X_vd;
-
-    choked_vec(ii)    = res.is_choked;
-    converged_vec(ii) = res.is_converged;
-
-    fprintf('m_dot=%.4f | beta_tt=%.4f | eta=%.4f | Ximp=%.3f | Xvd=%.3f | Mmax=%.3f | choked=%d | conv=%d\n', ...
-        m_dot, res.beta_tt, res.eta_c, res.X_imp, res.X_vd, res.M_max, res.is_choked, res.is_converged);
-end
-
-%% Keep only good points (no non-physical explosions)
-ok = converged_vec ...
-     & isfinite(beta_tt_vec) & isreal(beta_tt_vec) & beta_tt_vec > 1 & beta_tt_vec < 10 ...
-     & isfinite(eta_c_vec)   & isreal(eta_c_vec)   & eta_c_vec > 0   & eta_c_vec < 1.2;
-
-%% Dimensionless Mass Flow Parameter (Independent of speed)
-rho_t1 = Pt1 / (R * Tt1);
-a_t1 = sqrt(gamma * R * Tt1);
-m_nd_vec = m_dot_vec ./ (rho_t1 * a_t1 * geom.D2^2);
-m_nd_des = m_dot_des / (rho_t1 * a_t1 * geom.D2^2);
-
-m_nd_ok   = m_nd_vec(ok);
-b_ok   = beta_tt_vec(ok);
-eta_ok = eta_c_vec(ok);
-Ximp_ok = X_imp_vec(ok);
-Xvd_ok  = X_vd_vec(ok);
-ch_ok  = choked_vec(ok);
-
-%% CHOKE labeling (Supersonic flow):
-% We mark choke when any station Mach number (M1, M2, M3, M4, M6) >= 1.
-choke_idx = find(choked_vec, 1, 'first');
-if ~isempty(choke_idx)
-    m_nd_choke = m_nd_vec(choke_idx);
-else
-    m_nd_choke = nan;
-end
-
-%% SURGE labeling:
-% Peak pressure ratio point on the curve
-[~, i_peak] = max(b_ok);
-m_nd_surge = m_nd_ok(i_peak);
-
-%% Plot: flow - pressure ratio
-figure
-plot(m_nd_vec, beta_tt_vec, '.-')
-grid on
+% Setup figures
+fig1 = figure('Name', 'Compressor Map: Pressure Ratio');
+grid on; hold on;
 xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex')
 ylabel('$\beta_{tt} = P_{t,out}/P_{t,in}$', 'Interpreter', 'latex')
-title('Off-design performance: $\dot{m}_{nd} - \beta_{tt}$', 'Interpreter', 'latex')
-hold on
+title('Compressor Map: $\dot{m}_{nd} - \beta_{tt}$', 'Interpreter', 'latex')
 
-% Design marker
-plot(m_nd_des, design.beta_tt, 'o', 'MarkerSize', 8, 'LineWidth', 1.5)
-text(m_nd_des, design.beta_tt, sprintf('  Design ($\\dot{m}_{nd}=%.4f$, %.3f)', m_nd_des, design.beta_tt), 'Interpreter', 'latex')
-
-xline(m_nd_surge, '--', 'Surge (peak \beta_{tt})')
-if ~isnan(m_nd_choke)
-    xline(m_nd_choke, '--', 'Choke (M \geq 1)')
-end
-
-%% Plot: flow - efficiency
-figure
-plot(m_nd_vec, eta_c_vec, '.-')
-grid on
+fig2 = figure('Name', 'Compressor Map: Efficiency');
+grid on; hold on;
 xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex')
 ylabel('$\eta$', 'Interpreter', 'latex')
-title('Off-design performance: $\dot{m}_{nd} - \eta$', 'Interpreter', 'latex')
-hold on
+title('Compressor Map: $\dot{m}_{nd} - \eta$', 'Interpreter', 'latex')
 
-plot(m_nd_des, design.eta_c, 'o', 'MarkerSize', 8, 'LineWidth', 1.5)
-text(m_nd_des, design.eta_c, sprintf('  Design ($\\dot{m}_{nd}=%.4f$, %.4f)', m_nd_des, design.eta_c), 'Interpreter', 'latex')
+colors = lines(length(speed_ratios));
 
-xline(m_nd_surge, '--', 'Surge (peak \beta_{tt})')
-if ~isnan(m_nd_choke)
-    xline(m_nd_choke, '--', 'Choke (M \geq 1)')
+surge_points_m = [];
+surge_points_b = [];
+choke_points_m = [];
+choke_points_b = [];
+
+for s = 1:length(speed_ratios)
+    omega = omega_des * speed_ratios(s);
+    
+    % Adjust the mass flow sweep range roughly based on speed ratio
+    m_dot_vec = linspace(0.4 * m_dot_des * speed_ratios(s), 2.2 * m_dot_des * speed_ratios(s), 81);
+    
+    if speed_ratios(s) == 1.0
+        m_dot_vec = sort(unique([m_dot_vec, m_dot_des]));
+    end
+
+    % Preallocate
+    beta_tt_vec   = nan(size(m_dot_vec));
+    eta_c_vec     = nan(size(m_dot_vec));
+    eta_stage_vec = nan(size(m_dot_vec));
+    X_imp_vec     = nan(size(m_dot_vec));
+    X_vd_vec      = nan(size(m_dot_vec));
+    choked_vec    = false(size(m_dot_vec));
+    converged_vec = false(size(m_dot_vec));
+
+    fprintf('\n--- OFF-DESIGN sweep for speed N = %g%% started ---\n', speed_ratios(s)*100);
+
+    for ii = 1:numel(m_dot_vec)
+        m_dot = m_dot_vec(ii);
+
+        res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, mu_NH3);
+
+        beta_tt_vec(ii)   = res.beta_tt;
+        eta_c_vec(ii)     = res.eta_c;
+        eta_stage_vec(ii) = res.eta_stage_tt;
+
+        X_imp_vec(ii) = res.X_imp;
+        X_vd_vec(ii)  = res.X_vd;
+
+        choked_vec(ii)    = res.is_choked;
+        converged_vec(ii) = res.is_converged;
+    end
+
+    %% Keep only good points (no non-physical explosions)
+    ok = converged_vec ...
+         & isfinite(beta_tt_vec) & isreal(beta_tt_vec) & beta_tt_vec > 1 & beta_tt_vec < 10 ...
+         & isfinite(eta_c_vec)   & isreal(eta_c_vec)   & eta_c_vec > 0   & eta_c_vec < 1.2;
+
+    %% Dimensionless Mass Flow Parameter
+    rho_t1 = Pt1 / (R * Tt1);
+    a_t1 = sqrt(gamma * R * Tt1);
+    m_nd_vec = m_dot_vec ./ (rho_t1 * a_t1 * geom.D2^2);
+    
+    if speed_ratios(s) == 1.0
+        m_nd_des = m_dot_des / (rho_t1 * a_t1 * geom.D2^2);
+    end
+
+    m_nd_ok   = m_nd_vec(ok);
+    b_ok   = beta_tt_vec(ok);
+    eta_ok = eta_c_vec(ok);
+    
+    %% CHOKE labeling (Supersonic flow):
+    choke_idx = find(choked_vec, 1, 'first');
+    if ~isempty(choke_idx)
+        m_nd_choke = m_nd_vec(choke_idx);
+        % Find corresponding beta_tt for the plot
+        idx_c = find(m_nd_ok <= m_nd_choke, 1, 'last');
+        if ~isempty(idx_c)
+            choke_points_m = [choke_points_m, m_nd_ok(idx_c)];
+            choke_points_b = [choke_points_b, b_ok(idx_c)];
+        end
+    else
+        m_nd_choke = nan;
+    end
+
+    %% SURGE labeling:
+    % Peak pressure ratio point on the curve
+    [~, i_peak] = max(b_ok);
+    if ~isempty(i_peak)
+        m_nd_surge = m_nd_ok(i_peak);
+        surge_points_m = [surge_points_m, m_nd_surge];
+        surge_points_b = [surge_points_b, b_ok(i_peak)];
+    else
+        m_nd_surge = nan;
+    end
+
+    %% Plot: flow - pressure ratio
+    figure(fig1)
+    plot(m_nd_ok, b_ok, '.-', 'Color', colors(s,:), 'DisplayName', sprintf('N = %g%%', speed_ratios(s)*100));
+    
+    if speed_ratios(s) == 1.0
+        plot(m_nd_des, design.beta_tt, 'o', 'MarkerSize', 8, 'LineWidth', 1.5, 'Color', 'k', 'HandleVisibility', 'off')
+        text(m_nd_des, design.beta_tt, sprintf('  Design ($\\dot{m}_{nd}=%.4f$, %.3f)', m_nd_des, design.beta_tt), 'Interpreter', 'latex')
+    end
+
+    %% Plot: flow - efficiency
+    figure(fig2)
+    plot(m_nd_ok, eta_ok, '.-', 'Color', colors(s,:), 'DisplayName', sprintf('N = %g%%', speed_ratios(s)*100));
+    
+    if speed_ratios(s) == 1.0
+        plot(m_nd_des, design.eta_c, 'o', 'MarkerSize', 8, 'LineWidth', 1.5, 'Color', 'k', 'HandleVisibility', 'off')
+        text(m_nd_des, design.eta_c, sprintf('  Design ($\\dot{m}_{nd}=%.4f$, %.4f)', m_nd_des, design.eta_c), 'Interpreter', 'latex')
+    end
 end
 
-%% Diagnostics: X indicators (choke when X>0)
-figure
-plot(m_nd_vec, X_imp_vec, '.-'); grid on
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex'); ylabel('$X_{imp}$', 'Interpreter', 'latex')
-title('Impeller choke indicator $X$ (choke when $X>0$)', 'Interpreter', 'latex')
-yline(0,'--')
+%% Add Surge and Choke lines to the Map
+figure(fig1)
+if numel(surge_points_m) > 1
+    plot(surge_points_m, surge_points_b, '--^', 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5, 'DisplayName', 'Surge Line');
+end
+if numel(choke_points_m) > 1
+    plot(choke_points_m, choke_points_b, '--x', 'Color', [0.4940 0.1840 0.5560], 'LineWidth', 1.5, 'DisplayName', 'Choke Line');
+end
+legend('Location', 'southwest')
 
-figure
-plot(m_nd_vec, X_vd_vec, '.-'); grid on
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex'); ylabel('$X_{VD}$', 'Interpreter', 'latex')
-title('Vaned diffuser choke indicator $X$ (choke when $X>0$)', 'Interpreter', 'latex')
-yline(0,'--')
+figure(fig2)
+legend('Location', 'southwest')
+
+fprintf('\n--- MAP GENERATION COMPLETE ---\n');
 
 %% ====================== LOCAL FUNCTION ======================
 function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, mu_NH3)
@@ -207,7 +232,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         T1 = Tt1 - cm1.^2/(2*cp);
 
         if ~isreal(T1) || T1 <= 1
-            fprintf('  [DEBUG] T1 non-physical (M1 >= 1)\n');
+            % No console print here to avoid flooding during the big loop
             res.is_choked = true;
             res.is_converged = false; return
         end
@@ -223,7 +248,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
     if it >= 200
-        fprintf('  [DEBUG] Inlet iteration failed\n');
         res.is_converged = false; return
     end
 
@@ -292,7 +316,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         T2 = Tt2 - V2^2/(2*cp);
 
         if ~isreal(T2) || T2 <= 1
-            fprintf('  [DEBUG] T2 non-physical (M2 >= 1)\n');
             res.is_choked = true;
             res.is_converged = false; return
         end
@@ -302,7 +325,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         % Pt2 base guard (prevents insane explosions)
         basePt2 = 1 + (eta_tt*L)/(cp*Tt1);
         if ~isreal(basePt2) || basePt2 <= 0
-            fprintf('  [DEBUG] Pt2 base guard failure\n');
             res.is_converged = false; return
         end
 
@@ -422,7 +444,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
         if k >= 300
-            fprintf('  [DEBUG] Impeller iteration failed\n');
             res.is_converged = false; return
         end
     
@@ -464,7 +485,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     
                     T3 = Tt3-1/(2*cp)*V3^2;
                     if ~isreal(T3) || T3 <= 1
-                        fprintf('  [DEBUG] T3 non-physical (M3 >= 1)\n');
                         res.is_choked = true;
                         res.is_converged = false; return
                     end    
@@ -482,7 +502,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         end
     
         if j >= 200
-            fprintf('  [DEBUG] VLD iteration failed\n');
             res.is_converged=false; return
         end
 
@@ -571,7 +590,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         Tt4 = Tt2;
         T4 = Tt4 - V4^2/(2*cp);
         if ~isreal(T4) || T4 <= 1
-            fprintf('  [DEBUG] T4 non-physical (M4 >= 1)\n');
             res.is_choked = true;
             res.is_converged=false; return
         end
@@ -586,7 +604,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
     if it_vd >= 80
-        fprintf('  [DEBUG] VD iteration failed\n');
         res.is_converged=false; return
     end
 
@@ -626,7 +643,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
         T5 = Tt5-1/(2*cp)*V5^2;
         if ~isreal(T5) || T5 <= 1
-            fprintf('  [DEBUG] T5 non-physical\n');
             res.is_converged=false; return
         end
 
@@ -644,7 +660,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
     if jj >= 200
-        fprintf('  [DEBUG] VLD2 iteration failed\n');
         res.is_converged=false; return
     end
 
@@ -661,7 +676,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         Tt6 = Tt5;
         T6  = Tt6 - V6^2/(2*cp);
         if ~isreal(T6) || T6 <= 1
-            fprintf('  [DEBUG] T6 non-physical\n');
             res.is_converged=false; return
         end
 
@@ -696,7 +710,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
     if iter_vol >= 120
-        fprintf('  [DEBUG] Volute iteration failed\n');
         res.is_converged=false; return
     end
 
@@ -713,7 +726,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
     T7 = Tt7 - V7^2/(2*cp);
     if ~isreal(T7) || T7 <= 1
-        fprintf('  [DEBUG] T7 non-physical\n');
         res.is_converged=false; return
     end
 
