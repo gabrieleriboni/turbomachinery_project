@@ -27,6 +27,12 @@ geom.eps       = eps;
 % NOTE: beta2_geom is computed in your loop and is the one you want to freeze
 geom.beta2_geom = beta2_geom;
 
+% --- Impeller inlet geometric angles (fixed) ---
+geom.beta1_geom_tip  = beta1_geom_tip;
+geom.beta1_geom_mean = beta1_geom_mean;
+geom.beta1_geom_hub  = beta1_geom_hub;
+geom.A_th_imp_geom   = A_th_geom;
+
 % --- Vaneless diffuser geometry (fixed) ---
 geom.R3        = R3;
 geom.D3        = D3;
@@ -43,6 +49,9 @@ geom.W3          = W3;
 geom.W4          = W4;
 geom.Lb          = Lb;
 geom.theta_c     = theta_c;
+geom.camber      = camber;
+geom.sigma       = sigma;
+geom.theta       = theta;
 
 % --- Second vaneless diffuser geometry (fixed) ---
 geom.R5        = R5;

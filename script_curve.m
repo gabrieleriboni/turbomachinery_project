@@ -1,4 +1,4 @@
-%% off_design_curve.m
+%% script_curve.m
 clear
 close all
 clc
@@ -31,7 +31,7 @@ omega = geom.omega;
 
 %% Mass-flow sweep (include design point exactly)
 m_dot_des = geom.m_dot_design;
-m_dot_vec = sort(unique([linspace(0.6*m_dot_des,1.35*m_dot_des,41), m_dot_des]));
+m_dot_vec = sort(unique([linspace(0.6*m_dot_des,1.4*m_dot_des,81), m_dot_des]));
 
 % Preallocate
 beta_tt_vec   = nan(size(m_dot_vec));
@@ -59,8 +59,8 @@ for ii = 1:numel(m_dot_vec)
     choked_vec(ii)    = res.is_choked;
     converged_vec(ii) = res.is_converged;
 
-    fprintf('m_dot=%.4f | beta_tt=%.4f | eta=%.4f | Ximp=%.3f | Xvd=%.3f | choked=%d | conv=%d\n', ...
-        m_dot, res.beta_tt, res.eta_c, res.X_imp, res.X_vd, res.is_choked, res.is_converged);
+    fprintf('m_dot=%.4f | beta_tt=%.4f | eta=%.4f | Ximp=%.3f | Xvd=%.3f | Mmax=%.3f | choked=%d | conv=%d\n', ...
+        m_dot, res.beta_tt, res.eta_c, res.X_imp, res.X_vd, res.M_max, res.is_choked, res.is_converged);
 end
 
 %% Keep only good points (no non-physical explosions)
@@ -75,12 +75,11 @@ Ximp_ok = X_imp_vec(ok);
 Xvd_ok  = X_vd_vec(ok);
 ch_ok  = choked_vec(ok);
 
-%% CHOKE labeling (COERENT with your equations):
-% In your code: X = 11 - 10*(Cr*A_th)/A* and choke losses if X>0.
-% So we mark choke when X_imp > 0 OR X_vd > 0.
-choke_idx = find((Ximp_ok > 0) | (Xvd_ok > 0), 1, 'first');
+%% CHOKE labeling (Supersonic flow):
+% We mark choke when any station Mach number (M1, M2, M3, M4, M6) >= 1.
+choke_idx = find(choked_vec, 1, 'first');
 if ~isempty(choke_idx)
-    m_choke = m_ok(choke_idx);
+    m_choke = m_dot_vec(choke_idx);
 else
     m_choke = nan;
 end
@@ -94,9 +93,9 @@ m_surge = m_ok(i_peak);
 figure
 plot(m_dot_vec, beta_tt_vec, '.-')
 grid on
-xlabel('\dot{m} [kg/s]')
-ylabel('\beta_{tt} = P_{t,out}/P_{t,in}')
-title('Off-design performance: \dot{m} - \beta_{tt}')
+xlabel('$\dot{m}$ [kg/s]', 'Interpreter', 'latex')
+ylabel('$\beta_{tt} = P_{t,out}/P_{t,in}$', 'Interpreter', 'latex')
+title('Off-design performance: $\dot{m} - \beta_{tt}$', 'Interpreter', 'latex')
 hold on
 
 % Design marker
@@ -105,16 +104,16 @@ text(m_dot_des, design.beta_tt, sprintf('  Design (%.2f, %.3f)', m_dot_des, desi
 
 xline(m_surge, '--', 'Surge (peak \beta_{tt})')
 if ~isnan(m_choke)
-    xline(m_choke, '--', 'Choke (X>0)')
+    xline(m_choke, '--', 'Choke (M \geq 1)')
 end
 
 %% Plot: flow - efficiency
 figure
 plot(m_dot_vec, eta_c_vec, '.-')
 grid on
-xlabel('\dot{m} [kg/s]')
-ylabel('\eta')
-title('Off-design performance: \dot{m} - \eta')
+xlabel('$\dot{m}$ [kg/s]', 'Interpreter', 'latex')
+ylabel('$\eta$', 'Interpreter', 'latex')
+title('Off-design performance: $\dot{m} - \eta$', 'Interpreter', 'latex')
 hold on
 
 plot(m_dot_des, design.eta_c, 'o', 'MarkerSize', 8, 'LineWidth', 1.5)
@@ -122,20 +121,20 @@ text(m_dot_des, design.eta_c, sprintf('  Design (%.2f, %.4f)', m_dot_des, design
 
 xline(m_surge, '--', 'Surge (peak \beta_{tt})')
 if ~isnan(m_choke)
-    xline(m_choke, '--', 'Choke (X>0)')
+    xline(m_choke, '--', 'Choke (M \geq 1)')
 end
 
 %% Diagnostics: X indicators (choke when X>0)
 figure
 plot(m_dot_vec, X_imp_vec, '.-'); grid on
-xlabel('\dot{m} [kg/s]'); ylabel('X_{imp}')
-title('Impeller choke indicator X (choke when X>0)')
+xlabel('$\dot{m}$ [kg/s]', 'Interpreter', 'latex'); ylabel('$X_{imp}$', 'Interpreter', 'latex')
+title('Impeller choke indicator $X$ (choke when $X>0$)', 'Interpreter', 'latex')
 yline(0,'--')
 
 figure
 plot(m_dot_vec, X_vd_vec, '.-'); grid on
-xlabel('\dot{m} [kg/s]'); ylabel('X_{VD}')
-title('Vaned diffuser choke indicator X (choke when X>0)')
+xlabel('$\dot{m}$ [kg/s]', 'Interpreter', 'latex'); ylabel('$X_{VD}$', 'Interpreter', 'latex')
+title('Vaned diffuser choke indicator $X$ (choke when $X>0$)', 'Interpreter', 'latex')
 yline(0,'--')
 
 %% ====================== LOCAL FUNCTION ======================
@@ -149,6 +148,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     res.eta_stage_tt = NaN;
     res.X_imp        = NaN;
     res.X_vd         = NaN;
+    res.M_max        = NaN;
 
     % Fixed geometry
     D1_h = geom.D1_h; R1_h = geom.R1_h;
@@ -201,6 +201,8 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         T1 = Tt1 - cm1.^2/(2*cp);
 
         if ~isreal(T1) || T1 <= 1
+            fprintf('  [DEBUG] T1 non-physical (M1 >= 1)\n');
+            res.is_choked = true;
             res.is_converged = false; return
         end
 
@@ -215,6 +217,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
     if it >= 200
+        fprintf('  [DEBUG] Inlet iteration failed\n');
         res.is_converged = false; return
     end
 
@@ -238,6 +241,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     beta1_hub = atan(W1_hub_t/W1_meridional);
 
     V1 = W1_meridional;
+    M1 = V1/sqrt(gamma*R*T1);
 
     %% 2) Impeller outlet: iterate rho2 and eta_tt (fixed b2, closure via beta2_geom_fix)
     eta_tt = 0.90;
@@ -282,6 +286,8 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         T2 = Tt2 - V2^2/(2*cp);
 
         if ~isreal(T2) || T2 <= 1
+            fprintf('  [DEBUG] T2 non-physical (M2 >= 1)\n');
+            res.is_choked = true;
             res.is_converged = false; return
         end
 
@@ -290,6 +296,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         % Pt2 base guard (prevents insane explosions)
         basePt2 = 1 + (eta_tt*L)/(cp*Tt1);
         if ~isreal(basePt2) || basePt2 <= 0
+            fprintf('  [DEBUG] Pt2 base guard failure\n');
             res.is_converged = false; return
         end
 
@@ -303,40 +310,15 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
         % ---- FROM HERE: keep your correlation lines unchanged ----
 
-        solidity = 1/0.4;
-        dtheta = log(D2/D1_m) * tan(beta2);
-        c = R2 * dtheta/(sin(beta2));
-        s = c/solidity;
-        t = 0.003*D2;
-
-        beta_av = 0.5 * (beta1_mean + beta2);
-
-        N_bl_calc = ceil(2*pi*cos(beta_av)/(0.4*log(D2/D1_m)));
-        if mod(N_bl_calc,2)==1
-            N_bl_calc = N_bl_calc + 1;
-        end
-
-        mu = 1 - 0.63*pi/N_bl; % stanitz
-
-        V2_tg_inf = (1- mu)*U2 + V2_tg;
-        W2_tg_inf = V2_tg_inf - U2;
-        beta2_geom = atan(W2_tg_inf/W2_meridional);
-
-        beta1_geom_tip = atan(1-t*N_bl/(2*pi*R1_t_opt)*tan(beta1_tip));
-        beta1_geom_mean = atan(1-t*N_bl/(2*pi*R1_m)*tan(beta1_mean));
-        beta1_geom_hub = atan(1-t*N_bl/(2*pi*R1_h)*tan(beta1_hub));
-
-        dH_inc = 0.4*(W1_mean - V1/cos(beta1_mean))^2;
+        dH_inc = 0.4*(W1_mean - V1/cos(geom.beta1_geom_mean))^2;
 
         visc_din1 = mu_NH3(Tt1 - V1^2/(2*cp)); %sutherland
 
-        s1 = (pi * D1_m / N_bl) * cos(beta1_mean);
-
-        term_out = N_bl/pi + D2*cos(beta2)/b2;
-        term_in_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
-        term_in_den = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
-
-        D_h = D2*cos(beta2) / (term_out + term_in_num/term_in_den);
+        term_den1 = N_bl/pi + D2*cos(beta2)/b2;
+        term_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+        term_den2 = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+         
+        D_h = D2*cos(beta2) / (term_den1) + term_num/term_den2;
 
         Re_f = U2 * D_h/visc_din1*rho_t1;
 
@@ -374,8 +356,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         W_out = sqrt((V2_meridional * (A2_passages/A2_annulus))^2 + W2_tg^2);
         dH_mix = 1/2 * (W_sep - W_out)^2;
 
-        A_th_geom = s1 * b1;
-        A_th = 0.97 * A_th_geom;
+        A_th = 0.97 * geom.A_th_imp_geom;
 
         W_th = m_dot/N_bl/rho1/A_th;
 
@@ -387,12 +368,12 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
         M1_mean_rel = W1_mean/sqrt(gamma*R*(Tt1 - V1^2/(2*cp)));
 
-        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/(2*(gamma-1)))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
+        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(geom.beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/(2*(gamma-1)))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
 
-        C_r = sqrt((A1/N_bl-t)*cos(beta1_geom_mean)/A_th);
+        C_r = sqrt((A1/N_bl-t)*cos(geom.beta1_geom_mean)/A_th);
 
-        if C_r > 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2
-            C_r = 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2;
+        if C_r > 1-((A1/N_bl-t)*cos(geom.beta1_geom_mean)/A_th -1)^2
+            C_r = 1-((A1/N_bl-t)*cos(geom.beta1_geom_mean)/A_th -1)^2;
         end
 
         X = 11 - 10*(C_r*A_th)/A_th_star;   % <-- YOUR LINE
@@ -434,89 +415,90 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         k = k + 1;
     end
 
-    if k >= 300
-        res.is_converged = false; return
-    end
-
-    %% 3) Vaneless diffuser (geometry fixed)
-    if rad2deg(alpha2)>= 72
-        alpha3_deg = 72 + (rad2deg(alpha2)-72)/4;
-    else
-        alpha3_deg = 72;
-    end
-
-    alpha3 = deg2rad(alpha3_deg);
-
-    Tt3 = Tt2;
-    visc_din3 = visc_din2;
-
-    rho3 = rho2;
-    V3 = V2;
-
-    k_vld = 0.01;
-    errV3 = 1;
-    errrho3 = 1;
-    j = 0;
-    relaxation3 = 0.8;
-
-    while (abs(errrho3)>1e-5 || abs(errV3)>1e-5) && j < 200
-
-        rho_avg = 0.5*(rho2 + rho3);
-        V_avg = 0.5 * (V2 + V3);
-        D_avg = 0.5 * (D2+D3);
-
-        Re_avg = rho_avg * V_avg * D_avg/visc_din3;
-        Cf_vaneless = k_vld*(1.8e5/Re_avg)^0.2;
-
-        b3 = tan(alpha3)/tan(alpha2) * b2*rho2/rho3;  % pinch
+        if k >= 300
+            fprintf('  [DEBUG] Impeller iteration failed\n');
+            res.is_converged = false; return
+        end
+    
+        %% 3) Vaneless diffuser (geometry fixed)
+    
         b3 = b3_fix; % FIX geometry
-
-        V3_meridional = (V2_meridional*rho2*pi*D2*b2)/(rho3*pi*D3*b3);
-        V3_tg = V3_meridional*tan(alpha3);
-        V3_new = V3_meridional/cos(alpha3);
-
-        errV3 = abs(V3_new - V3)/max(V3,1e-9);
-        V3 = V3 + 0.8*(V3_new - V3);
-
-        dH_t_VLD = Cf_vaneless * V2^2 * R2 *(1-(R2/R3)^1.5)/(1.5*b2*cos(alpha2));
-
-        T3 = Tt3-1/(2*cp)*V3^2;
-        if ~isreal(T3) || T3 <= 1
+    
+    
+        Tt3 = Tt2;
+        visc_din3 = visc_din2;
+    
+        rho3 = rho2;
+        V3 = V2;
+    
+        k_vld = 0.01;
+        errV3 = 1;
+        errrho3 = 1;
+        j = 0;
+        relaxation3 = 0.8;
+    
+        while (abs(errrho3)>1e-5 || abs(errV3)>1e-5) && j < 200
+    
+            rho_avg = 0.5*(rho2 + rho3);
+            V_avg = 0.5 * (V2 + V3);
+            D_avg = 0.5 * (D2+D3);
+    
+            Re_avg = rho_avg * V_avg * D_avg/visc_din3;
+            Cf_vaneless = k_vld*(1.8e5/Re_avg)^0.2;
+    
+            alpha3 = atan(b3*tan(alpha2)*rho3/b2/rho2);
+            V3_meridional = (V2_meridional*rho2*pi*D2*b2)/(rho3*pi*D3*b3);
+            V3_tg = V3_meridional*tan(alpha3);
+            V3_new = V3_meridional/cos(alpha3);
+    
+            errV3 = abs(V3_new - V3)/max(V3,1e-9);
+            V3 = V3 + 0.8*(V3_new - V3);
+    
+            dH_t_VLD = Cf_vaneless * V2^2 * R2 *(1-(R2/R3)^1.5)/(1.5*b2*cos(alpha2));
+    
+                    T3 = Tt3-1/(2*cp)*V3^2;
+                    if ~isreal(T3) || T3 <= 1
+                        fprintf('  [DEBUG] T3 non-physical (M3 >= 1)\n');
+                        res.is_choked = true;
+                        res.is_converged = false; return
+                    end    
+            M3 = V3/sqrt(gamma*R*T3);
+    
+            Tt3_is = Tt3-dH_t_VLD/cp;
+            Pt3 = Pt2*(Tt3_is/Tt2)^(gamma/(gamma-1));
+            P3 = Pt3/(1+(gamma-1)/2*M3^2)^(gamma/(gamma-1));
+    
+            rho3_new = P3/(T3*R);
+            errrho3 = abs(rho3_new - rho3)/rho3;
+            rho3 = rho3 + relaxation3*(rho3_new - rho3);
+    
+            j = j+1;
+        end
+    
+        if j >= 200
+            fprintf('  [DEBUG] VLD iteration failed\n');
             res.is_converged=false; return
         end
 
-        M3 = V3/sqrt(gamma*R*T3);
-
-        Tt3_is = Tt3-dH_t_VLD/cp;
-        Pt3 = Pt2*(Tt3_is/Tt2)^(gamma/(gamma-1));
-        P3 = Pt3/(1+(gamma-1)/2*M3^2)^(gamma/(gamma-1));
-
-        rho3_new = P3/(T3*R);
-        errrho3 = abs(rho3_new - rho3)/rho3;
-        rho3 = rho3 + relaxation3*(rho3_new - rho3);
-
-        j = j+1;
-    end
-
-    if j >= 200
-        res.is_converged=false; return
-    end
-
     %% 4) Vaned diffuser (geometry fixed) + X_VD for choke label
-    rho4 = rho3;
-    V4 = V3;
+    
+
+    delta_s = (geom.theta * (0.92*(geom.camber)^2+0.02*alpha4_geom))/(sqrt(geom.sigma)-0.02*geom.theta);
+    d_delta_i = exp(((1.5-(90-alpha3_geom)/60)^2-3.3)*geom.sigma);
+    alpha4 = alpha4_geom - delta_s - d_delta_i * (alpha3_geom - alpha3);
+
+    rho4 =rho3;
     err_rho4 = 1;
     it_vd = 0;
-
     X_vd = -inf;
-
     while err_rho4 > 1e-5 && it_vd < 80
+
 
         rho4_old = rho4;
 
         V4_meridional = m_dot / (rho4_old * N_bl_VD * W4 * b4);
-        V4 = V4_meridional / cos(alpha4_geom);
-        V4_tg = V4 * sin(alpha4_geom);
+        V4 = V4_meridional / cos(alpha4);
+        V4_tg = V4 * sin(alpha4);
 
         % losses (UNCHANGED LINES)
         A_inlet_VD = W3 * b3_fix;
@@ -528,7 +510,6 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
         cos_alpha_opt = sqrt(cos(alpha3_geom) * cos_alpha_th_geom);
 
-        V3_meridional = (V2_meridional*rho2*pi*D2*b2)/(rho3*pi*D3*b3_fix);
         V3_opt = V3_meridional / cos_alpha_opt;
 
         dH_inc_VD = 0.4 * (V3 - V3_opt)^2;
@@ -580,6 +561,8 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         Tt4 = Tt2;
         T4 = Tt4 - V4^2/(2*cp);
         if ~isreal(T4) || T4 <= 1
+            fprintf('  [DEBUG] T4 non-physical (M4 >= 1)\n');
+            res.is_choked = true;
             res.is_converged=false; return
         end
 
@@ -593,6 +576,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
     if it_vd >= 80
+        fprintf('  [DEBUG] VD iteration failed\n');
         res.is_converged=false; return
     end
 
@@ -613,15 +597,13 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
         rho_avg = 0.5*(rho4 + rho5);
         V_avg = 0.5 * (V4 + V5);
-        D_avg = 0.5 * (D4+D5);
+        D_avg = 0.5 * (D4 + D5);
 
         Re_avg = rho_avg * V_avg * D_avg/visc_din5;
         Cf2_vaneless = kk*(1.8e5/Re_avg)^0.2;
 
-        alpha4 = alpha4_geom;
         alpha5 = atan(rho5/rho4*tan(alpha4));
 
-        V4_meridional = m_dot / (rho4 * N_bl_VD * W4 * b4);
         V5_meridional = (V4_meridional*rho4*pi*D4*b4)/(rho5*pi*D5*b5);
 
         V5_tg = V5_meridional*tan(alpha5);
@@ -634,6 +616,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
         T5 = Tt5-1/(2*cp)*V5^2;
         if ~isreal(T5) || T5 <= 1
+            fprintf('  [DEBUG] T5 non-physical\n');
             res.is_converged=false; return
         end
 
@@ -651,6 +634,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
     if jj >= 200
+        fprintf('  [DEBUG] VLD2 iteration failed\n');
         res.is_converged=false; return
     end
 
@@ -667,10 +651,11 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         Tt6 = Tt5;
         T6  = Tt6 - V6^2/(2*cp);
         if ~isreal(T6) || T6 <= 1
+            fprintf('  [DEBUG] T6 non-physical\n');
             res.is_converged=false; return
         end
 
-        dH_vol_merid = 0.5 * V4_meridional^2; % same structure as your volute block
+        dH_vol_merid = 0.5 * V5_meridional^2; % same structure as your volute block
 
         if SP >= 1
             term_sp = (1 - 1/SP^2);
@@ -701,6 +686,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     end
 
     if iter_vol >= 120
+        fprintf('  [DEBUG] Volute iteration failed\n');
         res.is_converged=false; return
     end
 
@@ -717,6 +703,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
     T7 = Tt7 - V7^2/(2*cp);
     if ~isreal(T7) || T7 <= 1
+        fprintf('  [DEBUG] T7 non-physical\n');
         res.is_converged=false; return
     end
 
@@ -731,8 +718,13 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     % stage efficiency (same structure you used)
     eta_stage_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD - dH_t_2VLD - dH_vol_tot - dH_cone)/(L_eul + dH_tot_parassitic);
 
-    % choke label consistent with your equations
-    is_choked = (X_imp > 0) || (X_vd > 0);
+    M2 = V2/sqrt(gamma*R*T2);
+    M3 = V3/sqrt(gamma*R*T3);
+    M4 = V4/sqrt(gamma*R*T4);
+    M6 = V6/sqrt(gamma*R*T6);
+
+    % choke label based on station Mach checks (supersonic flow)
+    is_choked = (M1 >= 1) || (M2 >= 1) || (M3 >= 1) || (M4 >= 1) || (M6 >= 1);
 
     % Output
     res.beta_tt      = beta_tt;
@@ -741,4 +733,5 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     res.X_imp        = X_imp;
     res.X_vd         = X_vd;
     res.is_choked    = is_choked;
+    res.M_max        = max([M1, M2, M3, M4, M6]);
 end

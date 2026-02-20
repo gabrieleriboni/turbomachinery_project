@@ -237,21 +237,22 @@ while abs(err_tot_vect(end))>1e-5
         beta2_geom = atan(W2_tg_inf/W2_meridional);
         beta2_geom_deg = beta2_geom *180/pi; % va bene per la correlazione
 
-
         % For ammonia applications, avoid going
         % below 2.5 mm – 3.0 mm at the tip.
         % Standard aero-compressors might go down to 0.8 mm,
         % but this is too fragile for industrial ammonia service where
         % impurities or liquid droplets might exist
-        beta1_geom_tip = atan(1-t*N_bl/(2*pi*R1_t_opt)*tan(beta1_tip));
-        beta1_geom_mean = atan(1-t*N_bl/(2*pi*R1_m)*tan(beta1_mean));
-        beta1_geom_hub = atan(1-t*N_bl/(2*pi*R1_h)*tan(beta1_hub));
+        
+        % Zero-incidence metal angles (blocked flow matching)
+        % Using (1-B) correction where B = t*N/(pi*D)
+        beta1_geom_tip = atan((1-t*N_bl/(2*pi*R1_t_opt))*tan(beta1_tip));
+        beta1_geom_mean = atan((1-t*N_bl/(2*pi*R1_m))*tan(beta1_mean));
+        beta1_geom_hub = atan((1-t*N_bl/(2*pi*R1_h))*tan(beta1_hub));
 
         %% rotor losses
 
-        % incidence=0 per costruzione ma non off-design
-
-        dH_inc = 0.4*(W1_mean - V1/cos(beta1_mean))^2;
+        % incidence loss relative to metal angle
+        dH_inc = 0.4*(W1_mean - V1/cos(beta1_geom_mean))^2;
 
         %%% IMPELLER INTERNAL
         % skin friction (Jansen, 1967)
@@ -260,13 +261,13 @@ while abs(err_tot_vect(end))>1e-5
         % Hydraulic diameter (Zhang et al. Eq 9)
         % Note: Using D2, b2, beta2 (Outlet) and D1, beta1 (Inlet)
         % s1 definition required for throat area calculation
-        s1 = (pi * D1_m / N_bl) * cos(beta1_mean);
+        s1 = (pi * D1_m / N_bl) * cos(beta1_geom_mean);
 
-        term_out = N_bl/pi + D2*cos(beta2)/b2;
-        term_in_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
-        term_in_den = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+        term_den1 = N_bl/pi + D2*cos(beta2)/b2;
+        term_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
+        term_den2 = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
         
-        D_h = D2*cos(beta2) / (term_out + term_in_num/term_in_den);
+        D_h = D2*cos(beta2) / (term_den1) + term_num/term_den2;
 
         Re_f = U2 * D_h/visc_din1*rho_t1;
         Cf = 0.0412 * Re_f ^(-0.1925);
