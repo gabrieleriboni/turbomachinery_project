@@ -61,6 +61,10 @@ for ii = 1:numel(m_dot_vec)
 
     fprintf('m_dot=%.4f | beta_tt=%.4f | eta=%.4f | Ximp=%.3f | Xvd=%.3f | Mmax=%.3f | choked=%d | conv=%d\n', ...
         m_dot, res.beta_tt, res.eta_c, res.X_imp, res.X_vd, res.M_max, res.is_choked, res.is_converged);
+    if res.is_converged
+        fprintf('  [MASS FLOW CHECK] Sec1:%.4f | Sec2:%.4f | Sec3:%.4f | Sec4:%.4f | Sec5:%.4f | Sec6:%.4f | Sec7:%.4f\n', ...
+            res.m_dot_1, res.m_dot_2, res.m_dot_3, res.m_dot_4, res.m_dot_5, res.m_dot_6, res.m_dot_7);
+    end
 end
 
 %% Keep only good points (no non-physical explosions)
@@ -101,7 +105,7 @@ plot(m_nd_vec, beta_tt_vec, '.-')
 grid on
 xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex')
 ylabel('$\beta_{tt} = P_{t,out}/P_{t,in}$', 'Interpreter', 'latex')
-title('Off-design performance: $\dot{m}_{nd} - \beta_{tt}$', 'Interpreter', 'latex')
+title('\textbf{Off-design performance: $\dot{m}_{nd} - \beta_{tt}$}', 'Interpreter', 'latex')
 hold on
 
 % Design marker
@@ -119,7 +123,7 @@ plot(m_nd_vec, eta_c_vec, '.-')
 grid on
 xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex')
 ylabel('$\eta$', 'Interpreter', 'latex')
-title('Off-design performance: $\dot{m}_{nd} - \eta$', 'Interpreter', 'latex')
+title('\textbf{Off-design performance: $\dot{m}_{nd} - \eta$}', 'Interpreter', 'latex')
 hold on
 
 plot(m_nd_des, design.eta_c, 'o', 'MarkerSize', 8, 'LineWidth', 1.5)
@@ -134,13 +138,13 @@ end
 figure
 plot(m_nd_vec, X_imp_vec, '.-'); grid on
 xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex'); ylabel('$X_{imp}$', 'Interpreter', 'latex')
-title('Impeller choke indicator $X$ (choke when $X>0$)', 'Interpreter', 'latex')
+title('\textbf{Impeller choke indicator $X$ (choke when $X>0$)}', 'Interpreter', 'latex')
 yline(0,'--')
 
 figure
 plot(m_nd_vec, X_vd_vec, '.-'); grid on
 xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex'); ylabel('$X_{VD}$', 'Interpreter', 'latex')
-title('Vaned diffuser choke indicator $X$ (choke when $X>0$)', 'Interpreter', 'latex')
+title('\textbf{Vaned diffuser choke indicator $X$ (choke when $X>0$)}', 'Interpreter', 'latex')
 yline(0,'--')
 
 %% ====================== LOCAL FUNCTION ======================
@@ -735,6 +739,15 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
     % choke label based on station Mach checks (supersonic flow)
     is_choked = (M1 >= 1) || (M2 >= 1) || (M3 >= 1) || (M4 >= 1) || (M6 >= 1);
+
+    % Mass flow conservation checks
+    res.m_dot_1 = rho1 * W1_meridional * pi * (geom.R1_t^2 - geom.R1_h^2);
+    res.m_dot_2 = rho2 * V2_meridional * pi * D2 * b2;
+    res.m_dot_3 = rho3 * V3_meridional * pi * D3 * b3;
+    res.m_dot_4 = rho4 * V4_meridional * N_bl_VD * W4 * b4;
+    res.m_dot_5 = rho5 * V5_meridional * pi * D5 * b5;
+    res.m_dot_6 = rho6 * V6 * A6;
+    res.m_dot_7 = (P7/(R*T7)) * V7 * A7;
 
     % Output
     res.beta_tt      = beta_tt;

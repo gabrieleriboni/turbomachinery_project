@@ -740,15 +740,15 @@ end
 figure
 semilogy(iter_tot, err_tot_vect, '.-')
 grid on
-title('err\_eta\_c')
-xlabel('iter')
-ylabel('log(err_{eta\_c})')
+title('\textbf{Error on \boldmath$\eta_c$}', 'Interpreter', 'latex')
+xlabel('iter [-]', 'Interpreter', 'latex')
+ylabel('$\log(err_{\eta_c}) [-]$', 'Interpreter', 'latex')
 figure
 plot(iter_tot, eta_c_vect, '.-')
 grid on
-title('\eta_c')
-xlabel('iter')
-ylabel('\eta_c')
+title('\boldmath$\eta_c$', 'Interpreter', 'latex')
+xlabel('iter [-]', 'Interpreter', 'latex')
+ylabel('$\eta_c [-]$', 'Interpreter', 'latex')
 
 %% Checks
 
@@ -756,6 +756,9 @@ m_dot1 = rho * V1 * pi * (R1_t_opt^2 - R1_h^2); % V1_meridional = V1
 m_dot2 = rho2 * V2_meridional * D2 * b2 * pi;
 m_dot3 = rho3 * V3_meridional*D3*b3*pi;
 m_dot4 = rho4 * V4_meridional * N_bl_VD * W4 * b4;
+m_dot5 = rho5 * V5_meridional * D5 * b5 * pi;
+m_dot6 = rho6 * V6 * A6;
+m_dot7 = rho7_final * V7 * A7;
 
 check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'tau', tau, '<1 backwards';
@@ -780,60 +783,68 @@ check = {'psi', psi * 4,'[0.7-0.8] unshrouded ([0.6-0.7] shrouded)';
     'm. flow 1',m_dot1,'3';
     'm. flow 2',m_dot2,'3';
     'm. flow 3',m_dot3,'3';
-    'm. flow 4',m_dot4,'3'}
+    'm. flow 4',m_dot4,'3';
+    'm. flow 5',m_dot5,'3';
+    'm. flow 6',m_dot6,'3';
+    'm. flow 7',m_dot7,'3'}
 
 %% plot velocity triangles
 
 figure
 subplot(1,2,1)
-title('impeller inlet')
-xlabel('meridional')
-ylabel('tangential')
+title('\textbf{Impeller Inlet}', 'Interpreter', 'latex')
+xlabel('meridional [m/s]', 'Interpreter', 'latex')
+ylabel('tangential [m/s]', 'Interpreter', 'latex')
 hold on
 
-% W1 parte da U1
-quiver(0,U1_tip,  W1_meridional,W1_tip_t, 0, 'r')
-quiver(0,U1_mean, W1_meridional,W1_mean_t, 0, 'r')
-quiver(0,U1_hub,  W1_meridional,W1_hub_t, 0, 'r')
+% W1 starting from origin
+quiver(0,0,  W1_meridional,W1_tip_t, 0, 'r')
+quiver(0,0,  W1_meridional,W1_mean_t, 0, 'r')
+quiver(0,0,  W1_meridional,W1_hub_t, 0, 'r')
 
-% U1
-quiver(0,0, 0,U1_tip, 0,  'k')
-quiver(0,0, 0,U1_mean, 0, 'k')
-quiver(0,0, 0,U1_hub, 0, 'k')
+% U1 starting from end of W1
+quiver(W1_meridional,W1_tip_t, 0,U1_tip, 0,  'k')
+quiver(W1_meridional,W1_mean_t, 0,U1_mean, 0, 'k')
+quiver(W1_meridional,W1_hub_t, 0,U1_hub, 0, 'k')
 
-% V1
+% Markers for start of U1
+plot(W1_meridional, W1_tip_t, 'kx', 'MarkerSize', 8)
+plot(W1_meridional, W1_mean_t, 'kx', 'MarkerSize', 8)
+plot(W1_meridional, W1_hub_t, 'kx', 'MarkerSize', 8)
+
+% V1 starting from origin
 quiver(0,0, V1,0, 0,'c')
 axis equal
 grid on
 
 
 offset = 1.5;
-text(V1/2, offset, 'V_1', 'Color','c');
-text(0, U1_tip/2 + offset, 'U_{1,tip}', 'Color','k');
-text(0, U1_mean/2 + offset, 'U_{1,mean}', 'Color','k');
-text(0, U1_hub/2 + offset, 'U_{1,hub}', 'Color','k');
-text(W1_meridional/2, U1_tip + W1_tip_t/2 + offset, 'W_{1,tip}', 'Color','r');
-text(W1_meridional/2, U1_mean + W1_mean_t/2 + offset, 'W_{1,mean}', 'Color','r');
-text(W1_meridional/2, U1_hub + W1_hub_t/2 + offset, 'W_{1,hub}', 'Color','r');
+text(V1/2, -offset, '$V_1$', 'Color','c', 'Interpreter', 'latex', 'VerticalAlignment', 'top');
+text(W1_meridional + offset, (W1_tip_t + W1_mean_t)/2, '$U_{1,tip}$', 'Color','k', 'Interpreter', 'latex');
+text(W1_meridional + offset, (W1_mean_t + W1_hub_t)/2, '$U_{1,mean}$', 'Color','k', 'Interpreter', 'latex');
+text(W1_meridional + offset, W1_hub_t/2, '$U_{1,hub}$', 'Color','k', 'Interpreter', 'latex');
+text(W1_meridional/2, W1_tip_t/2 - offset, '$W_{1,tip}$', 'Color','r', 'Interpreter', 'latex');
+text(W1_meridional/2, W1_mean_t/2 - offset, '$W_{1,mean}$', 'Color','r', 'Interpreter', 'latex');
+text(W1_meridional/2, W1_hub_t/2 - offset, '$W_{1,hub}$', 'Color','r', 'Interpreter', 'latex');
 
 subplot(1,2,2)
-title('impeller outlet')
-xlabel('meridional')
-ylabel('tangential')
+title('\textbf{Impeller Outlet}', 'Interpreter', 'latex')
+xlabel('meridional [m/s]', 'Interpreter', 'latex')
+ylabel('tangential [m/s]', 'Interpreter', 'latex')
 hold on
 
-% W2 parte da U2
-quiver(0,U2,  W2_meridional,W2_tg, 0, 'r')
+% W2 starting from origin
+quiver(0,0,  W2_meridional,W2_tg, 0, 'r')
 
-% U2
-quiver(0,0, 0,U2, 0, 'k')
+% U2 starting from end of W2
+quiver(W2_meridional,W2_tg, 0,U2, 0, 'k')
 
-% V2
+% V2 starting from origin
 quiver(0,0, V2_meridional, V2_tg, 0,'c')
 axis equal
 grid on
 
 offset2 = 1.5;
-text(V2_meridional/2 + offset2, V2_tg/2 + offset2, 'V_2', 'Color','c');
-text(0, U2/2 + offset2, 'U_2', 'Color','k');
-text(W2_meridional/2, U2 + W2_tg/2 + offset2, 'W_2', 'Color','r');
+text(V2_meridional/2 + offset2, V2_tg/2 + offset2, '$V_2$', 'Color','c', 'Interpreter', 'latex');
+text(W2_meridional + offset2, W2_tg + U2/2, '$U_2$', 'Color','k', 'Interpreter', 'latex');
+text(W2_meridional/2, W2_tg/2 - offset2, '$W_2$', 'Color','r', 'Interpreter', 'latex');
