@@ -599,8 +599,15 @@ while abs(err_tot_vect(end))>1e-5
     Tt5 = Tt4;
     b5 = b4;
     visc_din5 = mu_NH3(T4);
+
+    % V4 for the vaneless space based on full annulus mass conservation
+    V4_vld_meridional = m_dot / (rho4 * pi * D4 * b4);
+    V4_vld_tg = V4_tg; % Tangential velocity is conserved
+    V4_vld = sqrt(V4_vld_meridional^2 + V4_vld_tg^2);
+    alpha4_vld = atan(V4_vld_tg / V4_vld_meridional);
+
     rho5 = rho4;  %first guess
-    V5 = V4;      %first guess
+    V5 = V4_vld;  %first guess
     kk = 0.01;
     errV5 = 1;
     errrho5 = 1;
@@ -617,20 +624,20 @@ while abs(err_tot_vect(end))>1e-5
         rho5 = rho5_vect(end);
         V5 = V5_vect(end);
         rho_avg = 0.5*(rho4 + rho5);
-        V_avg = 0.5 * (V4 + V5);
+        V_avg = 0.5 * (V4_vld + V5);
         D_avg = 0.5 * (D4+D5);
        
         Re_avg = rho_avg * V_avg * D_avg/visc_din5;
         Cf2_vaneless = kk*(1.8e5/Re_avg)^0.2;
-        alpha5 = atan(rho5/rho4*tan(alpha4));
-        V5_meridional = (V4_meridional*rho4*pi*D4*b4)/(rho5*pi*D5*b5);
+        alpha5 = atan(rho5/rho4*tan(alpha4_vld));
+        V5_meridional = (V4_vld_meridional*rho4*pi*D4*b4)/(rho5*pi*D5*b5);
         V5_tg = V5_meridional*tan(alpha5);
         V5_new = V5_meridional/cos(alpha5);
         errV5_new = abs(V5_new-V5)/V5;
         err_V5 = [err_V5; errV5_new];
         V5_vect = [V5_vect; V5_new];
         V5 = V5_vect(end);
-        dH_t_2VLD = Cf2_vaneless * V4^2 * R4 *(1-(R4/R5)^1.5)/(1.5*b4*cos(alpha4));
+        dH_t_2VLD = Cf2_vaneless * V4_vld^2 * R4 *(1-(R4/R5)^1.5)/(1.5*b4*cos(alpha4_vld));
 
         T5 = Tt5-1/(2*cp)*V5^2;
         M5 = V5/sqrt(gamma*R*T5);
@@ -706,17 +713,26 @@ while abs(err_tot_vect(end))>1e-5
     AR_cone = 2.3;       % Area Ratio diffusore uscita
     A7 = A6 * AR_cone;
     D_exit = sqrt(4 * A7 / pi);
-    rho7 = rho6; 
-    V7 = m_dot / (rho7 * A7);
-    dH_cone = 0.5 * (V6 - V7)^2;
-    Tt7 = Tt6; % Adiabatico
-    Tt7_is = Tt7 - dH_cone / cp; % Sottraggo l'ulteriore perdita
-    Pt7 = Pt6 * (Tt7_is / Tt7)^(gamma/(gamma-1));
-    T7 = Tt7 - V7^2/(2*cp);
-    M7 = V7 / sqrt(gamma * R * T7);
-    P7 = Pt7 / (1 + (gamma-1)/2 * M7^2)^(gamma/(gamma-1));
-    rho7_final = P7 / (R * T7);
-    V7 = m_dot / (rho7_final * A7);
+    
+    rho7 = rho6;
+    err_rho7 = 1;
+    iter_cone = 0;
+    while err_rho7 > 1e-5 && iter_cone < 100
+        V7 = m_dot / (rho7 * A7);
+        dH_cone = 0.5 * (V6 - V7)^2;
+        Tt7 = Tt6; % Adiabatico
+        Tt7_is = Tt7 - dH_cone / cp; % Sottraggo l'ulteriore perdita
+        Pt7 = Pt6 * (Tt7_is / Tt7)^(gamma/(gamma-1));
+        T7 = Tt7 - V7^2/(2*cp);
+        M7 = V7 / sqrt(gamma * R * T7);
+        P7 = Pt7 / (1 + (gamma-1)/2 * M7^2)^(gamma/(gamma-1));
+        
+        rho7_new = P7 / (R * T7);
+        err_rho7 = abs(rho7_new - rho7)/rho7;
+        rho7 = rho7 + 0.8*(rho7_new - rho7);
+        iter_cone = iter_cone + 1;
+    end
+    rho7_final = rho7;
 
 
     eta_stage_tt = (L_eul - dH_tot_internal - dH_t_VLD - dH_t_VD - dH_t_2VLD - dH_vol_tot - dH_cone)/(L_eul + dH_tot_parassitic);

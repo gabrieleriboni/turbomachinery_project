@@ -118,9 +118,9 @@ end
 figure
 plot(m_nd_vec, beta_tt_vec, '.-', 'LineWidth', 1.5)
 grid on; hold on;
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex')
-ylabel('$\beta_{tt} = P_{t,out}/P_{t,in}$', 'Interpreter', 'latex')
-title('Off-design performance H2: $\dot{m}_{nd} - \beta_{tt}$', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
+ylabel('$\beta_{tt} = P_{t,out}/P_{t,in}$ [-]', 'Interpreter', 'latex')
+title('\textbf{Off-design performance H2: \boldmath$\dot{m}_{nd} - \beta_{tt}$}', 'Interpreter', 'latex')
 
 if exist('m_nd_opt_H2', 'var')
     plot(m_nd_opt_H2, beta_opt_H2, 'o', 'MarkerSize', 8, 'LineWidth', 1.5)
@@ -133,9 +133,9 @@ if ~isnan(m_nd_choke), xline(m_nd_choke, '--k', 'Choke (M \geq 1)'); end
 figure
 plot(m_nd_vec, eta_c_vec, '.-', 'LineWidth', 1.5)
 grid on; hold on;
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex')
-ylabel('$\eta$', 'Interpreter', 'latex')
-title('Off-design performance H2: $\dot{m}_{nd} - \eta$', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
+ylabel('$\eta$ [-]', 'Interpreter', 'latex')
+title('\textbf{Off-design performance H2: \boldmath$\dot{m}_{nd} - \eta$}', 'Interpreter', 'latex')
 
 if exist('m_nd_opt_H2', 'var')
     plot(m_nd_opt_H2, max_eta_H2, 'o', 'MarkerSize', 8, 'LineWidth', 1.5)
@@ -361,16 +361,24 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     if it_vd >= 80, res.is_converged=false; return; end
     
     %% 5) Second vaneless diffuser
-    Tt5 = Tt4; visc_din5 = mu_gas(T4); rho5 = rho4; V5 = V4;
+    Tt5 = Tt4; visc_din5 = mu_gas(T4); 
+    
+    % V4 for the vaneless space based on full annulus mass conservation
+    V4_vld_meridional = m_dot / (rho4 * pi * D4 * b4);
+    V4_vld_tg = V4_tg; % Tangential velocity is conserved
+    V4_vld = sqrt(V4_vld_meridional^2 + V4_vld_tg^2);
+    alpha4_vld = atan(V4_vld_tg / V4_vld_meridional);
+
+    rho5 = rho4; V5 = V4_vld;
     kk = 0.01; errV5 = 1; errrho5 = 1; jj = 0; relaxation5 = 0.8;
     while (abs(errrho5)>1e-5 || abs(errV5)>1e-5) && jj < 200
-        rho_avg = 0.5*(rho4 + rho5); V_avg = 0.5 * (V4 + V5); D_avg = 0.5 * (D4 + D5);
+        rho_avg = 0.5*(rho4 + rho5); V_avg = 0.5 * (V4_vld + V5); D_avg = 0.5 * (D4 + D5);
         Re_avg = rho_avg * V_avg * D_avg/visc_din5; Cf2_vaneless = kk*(1.8e5/Re_avg)^0.2;
-        alpha5 = atan(rho5/rho4*tan(alpha4));
-        V5_meridional = (V4_meridional*rho4*pi*D4*b4)/(rho5*pi*D5*b5);
+        alpha5 = atan(rho5/rho4*tan(alpha4_vld));
+        V5_meridional = (V4_vld_meridional*rho4*pi*D4*b4)/(rho5*pi*D5*b5);
         V5_tg = V5_meridional*tan(alpha5); V5_new = V5_meridional/cos(alpha5);
         errV5 = abs(V5_new - V5)/max(V5,1e-9); V5 = V5 + 0.8*(V5_new - V5);
-        dH_t_2VLD = Cf2_vaneless * V4^2 * R4 *(1-(R4/R5)^1.5)/(1.5*b4*cos(alpha4));
+        dH_t_2VLD = Cf2_vaneless * V4_vld^2 * R4 *(1-(R4/R5)^1.5)/(1.5*b4*cos(alpha4_vld));
         T5 = Tt5-1/(2*cp)*V5^2;
         if ~isreal(T5) || T5 <= 1, res.is_converged=false; return; end
         M5 = V5/sqrt(gamma*R*T5);
@@ -402,12 +410,22 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
     if iter_vol >= 120, res.is_converged=false; return; end
     
     %% 7) Exit cone
-    A7 = A6 * AR_cone; V7 = m_dot/(rho6*A7);
-    dH_cone = 0.5 * (V6 - V7)^2; Tt7 = Tt6;
-    Tt7_is = Tt7 - dH_cone/cp; Pt7 = Pt6 * (Tt7_is/Tt7)^(gamma/(gamma-1));
-    T7 = Tt7 - V7^2/(2*cp);
-    if ~isreal(T7) || T7 <= 1, res.is_converged=false; return; end
-    M7 = V7/sqrt(gamma*R*T7); P7 = Pt7/(1+(gamma-1)/2*M7^2)^(gamma/(gamma-1));
+    A7 = A6 * AR_cone; 
+    
+    rho7 = rho6; err_rho7 = 1; iter_cone = 0;
+    while err_rho7 > 1e-5 && iter_cone < 100
+        V7 = m_dot/(rho7*A7);
+        dH_cone = 0.5 * (V6 - V7)^2; Tt7 = Tt6;
+        Tt7_is = Tt7 - dH_cone/cp; Pt7 = Pt6 * (Tt7_is/Tt7)^(gamma/(gamma-1));
+        T7 = Tt7 - V7^2/(2*cp);
+        if ~isreal(T7) || T7 <= 1, res.is_converged=false; return; end
+        M7 = V7/sqrt(gamma*R*T7); P7 = Pt7/(1+(gamma-1)/2*M7^2)^(gamma/(gamma-1));
+        rho7_new = P7/(R*T7); err_rho7 = abs(rho7_new - rho7)/rho7;
+        rho7 = rho7 + 0.8*(rho7_new - rho7);
+        iter_cone = iter_cone + 1;
+    end
+    if iter_cone >= 100, res.is_converged=false; return; end
+    rho7_final = rho7;
     beta_tt = Pt7/Pt1;
     
     L_is = cp*Tt1*(beta_tt^((gamma-1)/gamma)-1);
