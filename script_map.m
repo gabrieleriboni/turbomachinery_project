@@ -136,7 +136,7 @@ for s = 1:length(speed_ratios)
 
     %% Plot: flow - pressure ratio
     figure(fig1)
-    plot(m_nd_ok, b_ok, '.-', 'Color', colors(s,:), 'DisplayName', sprintf('N = %g%%', speed_ratios(s)*100));
+    plot(m_nd_ok, b_ok, '.-', 'Color', colors(s,:), 'DisplayName', sprintf('$n = %.0f$ rpm', omega * 30 / pi));
     
     if speed_ratios(s) == 1.0
         plot(m_nd_des, design.beta_tt, 'o', 'MarkerSize', 8, 'LineWidth', 1.5, 'Color', 'k', 'HandleVisibility', 'off')
@@ -145,7 +145,7 @@ for s = 1:length(speed_ratios)
 
     %% Plot: flow - efficiency
     figure(fig2)
-    plot(m_nd_ok, eta_ok, '.-', 'Color', colors(s,:), 'DisplayName', sprintf('N = %g%%', speed_ratios(s)*100));
+    plot(m_nd_ok, eta_ok, '.-', 'Color', colors(s,:), 'DisplayName', sprintf('$n = %.0f$ rpm', omega * 30 / pi));
     
     if speed_ratios(s) == 1.0
         plot(m_nd_des, design.eta_c, 'o', 'MarkerSize', 8, 'LineWidth', 1.5, 'Color', 'k', 'HandleVisibility', 'off')
@@ -161,10 +161,10 @@ end
 if numel(choke_points_m) > 1
     plot(choke_points_m, choke_points_b, '--x', 'Color', [0.4940 0.1840 0.5560], 'LineWidth', 1.5, 'DisplayName', 'Choke Line');
 end
-legend('Location', 'southwest')
+legend('Location', 'best', 'Interpreter', 'latex')
 
 figure(fig2)
-legend('Location', 'southwest')
+legend('Location', 'best', 'Interpreter', 'latex')
 
 fprintf('\n--- MAP GENERATION COMPLETE ---\n');
 
