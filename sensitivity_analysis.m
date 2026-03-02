@@ -13,6 +13,7 @@ clc
 Ds_vect = 3.5:0.5:7.5; % Range of Specific Diameters to test
 Eta_results = [];
 U2_results = [];
+Stress_results = [];
 D2_results = [];
 b2_results = [];
 
@@ -574,40 +575,57 @@ for Ds = Ds_vect
     % Store Results
     Eta_results = [Eta_results, eta_stage_tt];
     U2_results = [U2_results, U2];
+    
+    % Centrifugal Stress Calculation (Titanium)
+    % sigma = k * rho * U2^2 [Pa] -> convert to [MPa]
+    % k = 0.8 (shape factor), rho = 4500 (Titanium)
+    sigma_max = 0.8 * 4500 * U2^2 / 1e6; 
+    Stress_results = [Stress_results, sigma_max];
+    
     D2_results = [D2_results, D2];
     b2_results = [b2_results, b2];
     
     % --- CONTROLLO TESTUALE FINE ITERAZIONE ---
-    fprintf('   -> Completato. Eta=%.4f | U2=%.1f m/s (Iterazioni globali: %d)\n', eta_stage_tt, U2, m);
+    fprintf('   -> Completato. Eta=%.4f | U2=%.1f m/s | Stress=%.1f MPa (Iterazioni globali: %d)\n', eta_stage_tt, U2, sigma_max, m);
 end
 
 %% Plotting
-figure('Name', 'Sensitivity Analysis')
+figure('Name', 'Sensitivity Analysis with Structural Limits')
 subplot(2,2,1)
 plot(Ds_vect, Eta_results*100, 'r-o', 'LineWidth', 1.5)
 grid on
 xlabel('Specific Diameter $D_s$ [-]', 'Interpreter', 'latex')
 ylabel('Stage Efficiency $\eta$ [\%]', 'Interpreter', 'latex')
 title('\textbf{Efficiency Optimization}', 'Interpreter', 'latex')
+
 subplot(2,2,2)
+yyaxis left
 plot(Ds_vect, U2_results, 'b-o', 'LineWidth', 1.5)
-grid on
-yline(500, 'k--', 'Limit (Titanium)');
-xlabel('Specific Diameter $D_s$ [-]', 'Interpreter', 'latex')
 ylabel('Tip Speed $U_2$ [m/s]', 'Interpreter', 'latex')
-title('\textbf{Mechanical Constraints}', 'Interpreter', 'latex')
+ax = gca; ax.YColor = 'b';
+grid on
+yyaxis right
+plot(Ds_vect, Stress_results, 'm-s', 'LineWidth', 1.5)
+ylabel('Max Stress $\sigma_c$ [MPa]', 'Interpreter', 'latex')
+ax.YColor = 'm';
+yline(600, 'k--', 'Allowable (Ti-6Al-4V)', 'LineWidth', 2);
+xlabel('Specific Diameter $D_s$ [-]', 'Interpreter', 'latex')
+title('\textbf{Mechanical \& Stress Limits}', 'Interpreter', 'latex')
+
 subplot(2,2,3)
 plot(Ds_vect, D2_results*1000, 'k-o', 'LineWidth', 1.5)
 grid on
 xlabel('Specific Diameter $D_s$ [-]', 'Interpreter', 'latex')
 ylabel('Rotor Diameter $D_2$ [mm]', 'Interpreter', 'latex')
 title('\textbf{Geometry Variation}', 'Interpreter', 'latex')
+
 subplot(2,2,4)
 plot(Ds_vect, b2_results*1000, 'g-o', 'LineWidth', 1.5)
 grid on
 xlabel('Specific Diameter $D_s$ [-]', 'Interpreter', 'latex')
 ylabel('Blade Height $b_2$ [mm]', 'Interpreter', 'latex')
 title('\textbf{Blade Height Variation}', 'Interpreter', 'latex')
+
 % Find Optimal
 [max_eta, idx] = max(Eta_results);
 fprintf('\n==========================================\n');
@@ -615,4 +633,5 @@ fprintf('--- Sensitivity Analysis Results ---\n');
 fprintf('Optimal Ds: %.2f\n', Ds_vect(idx));
 fprintf('Max Efficiency: %.2f%%\n', max_eta*100);
 fprintf('Corresponding U2: %.1f m/s\n', U2_results(idx));
+fprintf('Corresponding Stress: %.1f MPa\n', Stress_results(idx));
 fprintf('==========================================\n');
