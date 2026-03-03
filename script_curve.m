@@ -98,19 +98,26 @@ end
 % Peak pressure ratio point on the curve
 [~, i_peak] = max(b_ok);
 m_nd_surge = m_nd_ok(i_peak);
+beta_surge = b_ok(i_peak);
+
+% Formal Surge Margin Calculation
+SM = ((m_nd_des - m_nd_surge) / m_nd_des) * 100;
+fprintf('\n==========================================\n');
+fprintf('>>> DESIGN SURGE MARGIN: %.2f%% <<<\n', SM);
+fprintf('==========================================\n\n');
 
 %% Plot: flow - pressure ratio
 figure
 plot(m_nd_vec, beta_tt_vec, '.-')
 grid on
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
 ylabel('$\beta_{tt} = P_{t,out}/P_{t,in}$ [-]', 'Interpreter', 'latex')
 title('\textbf{Off-design performance: \boldmath$\dot{m}_{nd} - \beta_{tt}$}', 'Interpreter', 'latex')
 hold on
 
 % Design marker
-plot(m_nd_des, design.beta_tt, 'o', 'MarkerSize', 8, 'LineWidth', 1.5)
-text(m_nd_des, design.beta_tt, sprintf('  Design ($\\dot{m}_{nd}=%.4f$, %.3f)', m_nd_des, design.beta_tt), 'Interpreter', 'latex')
+plot(m_nd_des, design.beta_tt, 'o', 'Color', [0.7, 0, 0], 'MarkerSize', 8, 'LineWidth', 1.5)
+text(m_nd_des, design.beta_tt, sprintf('\\quad Design ($\\dot{m}_{nd}=%.4f$, %.3f)', m_nd_des, design.beta_tt), 'Interpreter', 'latex', 'Color', [0.7, 0, 0])
 
 xline(m_nd_surge, '--', 'Surge (peak \beta_{tt})')
 if ~isnan(m_nd_choke)
@@ -121,13 +128,13 @@ end
 figure
 plot(m_nd_vec, eta_c_vec, '.-')
 grid on
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex')
-ylabel('$\eta$', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
+ylabel('$\eta$ [-]', 'Interpreter', 'latex')
 title('\textbf{Off-design performance: \boldmath$\dot{m}_{nd} - \eta$}', 'Interpreter', 'latex')
 hold on
 
-plot(m_nd_des, design.eta_c, 'o', 'MarkerSize', 8, 'LineWidth', 1.5)
-text(m_nd_des, design.eta_c, sprintf('  Design ($\\dot{m}_{nd}=%.4f$, %.4f)', m_nd_des, design.eta_c), 'Interpreter', 'latex')
+plot(m_nd_des, design.eta_c, 'o', 'Color', [0.7, 0, 0], 'MarkerSize', 8, 'LineWidth', 1.5)
+text(m_nd_des, design.eta_c, sprintf('\\quad Design ($\\dot{m}_{nd}=%.4f$, %.4f)', m_nd_des, design.eta_c), 'Interpreter', 'latex', 'Color', [0.7, 0, 0])
 
 xline(m_nd_surge, '--', 'Surge (peak \beta_{tt})')
 if ~isnan(m_nd_choke)
@@ -137,13 +144,13 @@ end
 %% Diagnostics: X indicators (choke when X>0)
 figure
 plot(m_nd_vec, X_imp_vec, '.-'); grid on
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex'); ylabel('$X_{imp}$', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex'); ylabel('$X_{imp}$ [-]', 'Interpreter', 'latex')
 title('\textbf{Impeller choke indicator \boldmath$X$ (choke when \boldmath$X>0$)}', 'Interpreter', 'latex')
 yline(0,'--')
 
 figure
 plot(m_nd_vec, X_vd_vec, '.-'); grid on
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$', 'Interpreter', 'latex'); ylabel('$X_{VD}$', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex'); ylabel('$X_{VD}$ [-]', 'Interpreter', 'latex')
 title('\textbf{Vaned diffuser choke indicator \boldmath$X$ (choke when \boldmath$X>0$)}', 'Interpreter', 'latex')
 yline(0,'--')
 
@@ -363,7 +370,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         A2_annulus = pi*b2*D2;
         A2_passages = A2_annulus * eps2;
 
-        W_out = sqrt((V2_meridional * (A2_passages/A2_annulus))^2 + W2_tg^2);
+        W_out = sqrt(V2_meridional^2 + W2_tg^2); % V2_meridional is already mixed-out
         dH_mix = 1/2 * (W_sep - W_out)^2;
 
         A_th = 0.97 * geom.A_th_imp_geom;
@@ -378,7 +385,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
         M1_mean_rel = W1_mean/sqrt(gamma*R*(Tt1 - V1^2/(2*cp)));
 
-        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(geom.beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/(2*(gamma-1)))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
+        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(geom.beta1_geom_mean) / ( (2/(gamma+1))*(1+(gamma-1)/2*M1_mean_rel^2) )^((gamma+1)/(2*(gamma-1)));
 
         C_r = sqrt((A1/N_bl-t)*cos(geom.beta1_geom_mean)/A_th);
 

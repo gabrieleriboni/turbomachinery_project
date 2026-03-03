@@ -37,13 +37,13 @@ speed_ratios = [0.4, 0.6, 0.8, 1.0, 1.1, 1.2, 1.4];
 % Setup figures
 fig1 = figure('Name', 'Compressor Map: Pressure Ratio');
 grid on; hold on;
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
 ylabel('$\beta_{tt} = P_{t,out}/P_{t,in}$ [-]', 'Interpreter', 'latex')
 title('\textbf{Compressor Map: \boldmath$\dot{m}_{nd} - \beta_{tt}$}', 'Interpreter', 'latex')
 
 fig2 = figure('Name', 'Compressor Map: Efficiency');
 grid on; hold on;
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
 ylabel('$\eta$ [-]', 'Interpreter', 'latex')
 title('\textbf{Compressor Map: \boldmath$\dot{m}_{nd} - \eta$}', 'Interpreter', 'latex')
 
@@ -128,8 +128,17 @@ for s = 1:length(speed_ratios)
     [~, i_peak] = max(b_ok);
     if ~isempty(i_peak)
         m_nd_surge = m_nd_ok(i_peak);
+        beta_surge = b_ok(i_peak);
+        eta_surge = eta_ok(i_peak);
         surge_points_m = [surge_points_m, m_nd_surge];
-        surge_points_b = [surge_points_b, b_ok(i_peak)];
+        surge_points_b = [surge_points_b, beta_surge];
+        
+        if speed_ratios(s) == 1.0
+            SM = ((m_nd_des - m_nd_surge) / m_nd_des) * 100;
+            fprintf('\n==========================================\n');
+            fprintf('>>> DESIGN SURGE MARGIN: %.2f%% <<<\n', SM);
+            fprintf('==========================================\n\n');
+        end
     else
         m_nd_surge = nan;
     end
@@ -139,8 +148,8 @@ for s = 1:length(speed_ratios)
     plot(m_nd_ok, b_ok, '.-', 'Color', colors(s,:), 'DisplayName', sprintf('$n = %.0f$ rpm', omega * 30 / pi));
     
     if speed_ratios(s) == 1.0
-        plot(m_nd_des, design.beta_tt, 'o', 'MarkerSize', 8, 'LineWidth', 1.5, 'Color', 'k', 'HandleVisibility', 'off')
-        text(m_nd_des, design.beta_tt, sprintf('  Design ($\\dot{m}_{nd}=%.4f$, %.3f)', m_nd_des, design.beta_tt), 'Interpreter', 'latex')
+        plot(m_nd_des, design.beta_tt, 'o', 'Color', [0.7, 0, 0], 'MarkerSize', 8, 'LineWidth', 1.5, 'HandleVisibility', 'off')
+        text(m_nd_des, design.beta_tt, sprintf('\\quad Design ($\\dot{m}_{nd}=%.4f$, %.3f)', m_nd_des, design.beta_tt), 'Interpreter', 'latex', 'Color', [0.7, 0, 0])
     end
 
     %% Plot: flow - efficiency
@@ -148,8 +157,8 @@ for s = 1:length(speed_ratios)
     plot(m_nd_ok, eta_ok, '.-', 'Color', colors(s,:), 'DisplayName', sprintf('$n = %.0f$ rpm', omega * 30 / pi));
     
     if speed_ratios(s) == 1.0
-        plot(m_nd_des, design.eta_c, 'o', 'MarkerSize', 8, 'LineWidth', 1.5, 'Color', 'k', 'HandleVisibility', 'off')
-        text(m_nd_des, design.eta_c, sprintf('  Design ($\\dot{m}_{nd}=%.4f$, %.4f)', m_nd_des, design.eta_c), 'Interpreter', 'latex')
+        plot(m_nd_des, design.eta_c, 'o', 'Color', [0.7, 0, 0], 'MarkerSize', 8, 'LineWidth', 1.5, 'HandleVisibility', 'off')
+        text(m_nd_des, design.eta_c, sprintf('\\quad Design ($\\dot{m}_{nd}=%.4f$, %.4f)', m_nd_des, design.eta_c), 'Interpreter', 'latex', 'Color', [0.7, 0, 0])
     end
 end
 
@@ -381,7 +390,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         A2_annulus = pi*b2*D2;
         A2_passages = A2_annulus * eps2;
 
-        W_out = sqrt((V2_meridional * (A2_passages/A2_annulus))^2 + W2_tg^2);
+        W_out = sqrt(V2_meridional^2 + W2_tg^2); % V2_meridional is already mixed-out
         dH_mix = 1/2 * (W_sep - W_out)^2;
 
         A_th = 0.97 * geom.A_th_imp_geom;
@@ -396,7 +405,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
 
         M1_mean_rel = W1_mean/sqrt(gamma*R*(Tt1 - V1^2/(2*cp)));
 
-        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(geom.beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/(2*(gamma-1)))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
+        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(geom.beta1_geom_mean) / ( (2/(gamma+1))*(1+(gamma-1)/2*M1_mean_rel^2) )^((gamma+1)/(2*(gamma-1)));
 
         C_r = sqrt((A1/N_bl-t)*cos(geom.beta1_geom_mean)/A_th);
 

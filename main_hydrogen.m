@@ -118,7 +118,7 @@ end
 figure
 plot(m_nd_vec, beta_tt_vec, '.-', 'LineWidth', 1.5)
 grid on; hold on;
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
 ylabel('$\beta_{tt} = P_{t,out}/P_{t,in}$ [-]', 'Interpreter', 'latex')
 title('\textbf{Off-design performance H2: \boldmath$\dot{m}_{nd} - \beta_{tt}$}', 'Interpreter', 'latex')
 
@@ -133,7 +133,7 @@ if ~isnan(m_nd_choke), xline(m_nd_choke, '--k', 'Choke (M \geq 1)'); end
 figure
 plot(m_nd_vec, eta_c_vec, '.-', 'LineWidth', 1.5)
 grid on; hold on;
-xlabel('Dimensionless Mass Flow $\frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
+xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
 ylabel('$\eta$ [-]', 'Interpreter', 'latex')
 title('\textbf{Off-design performance H2: \boldmath$\dot{m}_{nd} - \eta$}', 'Interpreter', 'latex')
 
@@ -257,7 +257,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         if D_eq <= 2, W_sep = W2; else, W_sep = W2*D_eq*0.5; end
         eps2 = 1- (N_bl * t_te)/(pi*D2);
         A2_annulus = pi*b2*D2; A2_passages = A2_annulus * eps2;
-        W_out = sqrt((V2_meridional * (A2_passages/A2_annulus))^2 + W2_tg^2);
+        W_out = sqrt(V2_meridional^2 + W2_tg^2); % V2_meridional is already mixed-out
         dH_mix = 1/2 * (W_sep - W_out)^2;
         A_th = 0.97 * geom.A_th_imp_geom;
         W_th = m_dot/N_bl/rho1/A_th; dH_diff = 0.4*(W1_mean - W_th)^2;
@@ -265,7 +265,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
             dH_diff = 0.5*(W1_tip - 1.75*W_th)^2;
         end
         M1_mean_rel = W1_mean/sqrt(gamma*R*(Tt1 - V1^2/(2*cp)));
-        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(geom.beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/(2*(gamma-1)))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
+        A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(geom.beta1_geom_mean) / ( (2/(gamma+1))*(1+(gamma-1)/2*M1_mean_rel^2) )^((gamma+1)/(2*(gamma-1)));
         C_r = sqrt((A1/N_bl-t)*cos(geom.beta1_geom_mean)/A_th);
         if C_r > 1-((A1/N_bl-t)*cos(geom.beta1_geom_mean)/A_th -1)^2
             C_r = 1-((A1/N_bl-t)*cos(geom.beta1_geom_mean)/A_th -1)^2;

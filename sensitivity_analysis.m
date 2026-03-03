@@ -218,7 +218,7 @@ for Ds = Ds_vect
             eps2 = 1- (N_bl * t_te)/(pi*D2);
             A2_annulus = pi*b2*D2;
             A2_passages = A2_annulus * eps2;
-            W_out = sqrt((V2_meridional * (A2_passages/A2_annulus))^2 + W2_tg^2);
+            W_out = sqrt(V2_meridional^2 + W2_tg^2); % V2_meridional is already mixed-out
             dH_mix = 1/2 * (W_sep - W_out)^2;
             % entrance diffusion (Aungier)
             A_th_geom = s1 * b1; % Corrected s1 logic
@@ -230,7 +230,7 @@ for Ds = Ds_vect
             end
             % choke losses
             M1_mean_rel = W1_mean/sqrt(gamma*R*T1);
-            A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(beta1_geom_mean)/(1+(gamma-1)*M1_mean_rel^2/2)^((gamma+1)/(2*(gamma-1)))*(1+(gamma-1)/2)^((gamma+1)/2*(gamma-1));
+            A_th_star = M1_mean_rel*(A1/N_bl - t)*cos(beta1_geom_mean) / ( (2/(gamma+1))*(1+(gamma-1)/2*M1_mean_rel^2) )^((gamma+1)/(2*(gamma-1)));
             C_r = sqrt((A1/N_bl-t)*cos(beta1_geom_mean)/A_th);
             if C_r > 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2
                 C_r = 1-((A1/N_bl-t)*cos(beta1_geom_mean)/A_th -1)^2;
