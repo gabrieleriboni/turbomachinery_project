@@ -578,7 +578,7 @@ for Ds = Ds_vect
     
     % Centrifugal Stress Calculation (Titanium)
     % sigma = k * rho * U2^2 [Pa] -> convert to [MPa]
-    % k = 0.8 (shape factor), rho = 4500 (Titanium)
+    % k = 0.8 (shape factor), rho = 4500 (Titanium Ti-6246)
     sigma_max = 0.8 * 4500 * U2^2 / 1e6; 
     Stress_results = [Stress_results, sigma_max];
     
@@ -606,10 +606,10 @@ ax = gca; ax.YColor = 'b';
 grid on
 yyaxis right
 plot(Ds_vect, Stress_results, 'm-s', 'LineWidth', 1.5)
-ylabel('Max Stress $\sigma_c$ [MPa]', 'Interpreter', 'latex')
+ylabel('Max Stress \sigma_c [MPa]')
 ax.YColor = 'm';
-yline(600, 'k--', 'Allowable (Ti-6Al-4V)', 'LineWidth', 2);
-xlabel('Specific Diameter $D_s$ [-]', 'Interpreter', 'latex')
+yline(850, 'k--', 'Allowable (Ti-6246)', 'LineWidth', 2);
+xlabel('Specific Diameter D_s [-]')
 title('\textbf{Mechanical \& Stress Limits}', 'Interpreter', 'latex')
 
 subplot(2,2,3)
