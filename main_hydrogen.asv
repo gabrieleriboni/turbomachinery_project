@@ -151,7 +151,7 @@ plot(m_nd_vec, eta_c_vec, '.-')
 grid on
 xlabel('Dimensionless Mass Flow $\dot{m}_{nd} = \frac{\dot{m}}{\rho_{t1} a_{t1} D_2^2}$ [-]', 'Interpreter', 'latex')
 ylabel('$\eta$ [-]', 'Interpreter', 'latex')
-title('\textbf{H2 Compressor Curve: \boldmath$\dot{m}_{nd} - \eta$}', 'Interpreter', 'latex')
+title('\textbf{H2 Compr: \boldmath$\dot{m}_{nd} - \eta$}', 'Interpreter', 'latex')
 hold on
 
 if exist('m_nd_opt_H2', 'var')
