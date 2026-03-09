@@ -263,7 +263,7 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         term_den1 = N_bl/pi + D2*cos(beta2)/b2;
         term_num = 0.5*(D1_t_opt/D2 + D1_h/D2) * ((cos(beta1_tip) + cos(beta1_hub))/2);
         term_den2 = N_bl/pi + ((D1_t_opt + D1_h)/(D1_t_opt - D1_h)) * ((cos(beta1_tip) + cos(beta1_hub))/2);
-        D_h = D2*cos(beta2) / term_den1 + term_num/term_den2;
+        D_h = D2*(cos(beta2) / term_den1 + term_num/term_den2);
         Re_f = U2 * D_h/visc_din1*rho_t1;
         Cf = 0.0412 * Re_f ^(-0.1925);
         phi = 4 * (m_dot/rho_t1)/(pi*U2*D2^2);
@@ -364,7 +364,8 @@ function res = one_point_fixed_geom(m_dot, geom, Pt1, Tt1, omega, cp, gamma, R, 
         A_th_star = M3_abs * A_throat_geom / ( (2/(gamma+1))*(1+(gamma-1)/2*M3_abs^2) )^((gamma+1)/(2*(gamma-1)));
         X_vd = 11 - 10 * (Cr_VD * A_throat_geom) / A_th_star;
         if X_vd <= 0, dH_choke_VD = 0; else, dH_choke_VD = 1/2 * V3^2 * (0.05 * X_vd + X_vd^7); end
-        Cl = 1; C_theta = 1; k1 = 0.2*(1-1/Cl/C_theta); k2 = 2*theta_c/125/C_theta*(1-2*theta_c/22*C_theta);
+        Cl = 1; C_theta = 1; k1 = 0.2*(1-1/Cl/C_theta); C_theta = max(1, 2*theta_c/0.192);   % theta_c in rad
+k2 = (2.88*theta_c)/(pi*C_theta) * (1 - theta_c/(0.192*C_theta));
         Cr = 1/2*V3_meridional*cos(alpha4_geom)/(V4_meridional*cos(alpha3_geom))+1;
         B4 = (k1+k2*(Cr^2-1))*Lb/W4; dH_bl_VD = 1/2*(V4/(1-B4)-V4)^2;
         V_sep = V4/(1+2*C_theta); V4_meridional_mixed = m_dot / (rho4 * 2 * pi * R4 * b4);
